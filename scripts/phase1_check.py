@@ -120,10 +120,33 @@ def verify_unique_basenames(image: str) -> None:
         fail(f"flat object naming collision in {image}: {', '.join(duplicates)}")
 
 
+def verify_blank_toolchain_auto_detection() -> None:
+    """A blank inherited TOOLCHAIN must be treated the same as unset."""
+    image_dir = ROOT / "node-stm32f103" / "bootloader"
+    environment = os.environ.copy()
+    environment["TOOLCHAIN"] = ""
+    result = subprocess.run(
+        ["make", "info"],
+        cwd=image_dir,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=environment,
+    )
+    print(result.stdout, end="")
+    if result.returncode != 0:
+        fail("blank TOOLCHAIN environment variable disables auto-detection")
+    if "Toolchain   : gcc" not in result.stdout and "Toolchain   : clang" not in result.stdout:
+        fail("blank TOOLCHAIN did not resolve to gcc or clang")
+
+
 def main() -> None:
     missing = [item for item in REQUIRED if not (ROOT / item).is_file()]
     if missing:
         fail("missing required file(s): " + ", ".join(missing))
+
+    verify_blank_toolchain_auto_detection()
 
     toolchain = detect_toolchain()
     print(f"Phase 1 toolchain: {toolchain}")

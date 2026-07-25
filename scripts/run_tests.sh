@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 if [[ -n "${TOOLCHAIN:-}" ]]; then
-    make phase1-check "TOOLCHAIN=${TOOLCHAIN}"
+    make phase2-check "TOOLCHAIN=${TOOLCHAIN}"
 else
-    make phase1-check
+    make phase2-check
 fi

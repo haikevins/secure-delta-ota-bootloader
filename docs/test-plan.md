@@ -70,3 +70,16 @@ Status: Phase 0 baseline
 ## Final reliability target
 
 At least 100 automated update cycles with fault injection and no unrecoverable brick before the project is declared complete.
+
+## Phase 2 hardware acceptance
+
+- flash the combined image at `0x08000000`;
+- observe five bootloader flashes, a pause, then the application heartbeat;
+- confirm `SCB->VTOR == 0x08006000` after handoff in a debugger;
+- place a breakpoint in the application `SysTick_Handler`;
+- reset the board at least 100 times and confirm repeatable handoff;
+- erase/corrupt the application vector table and confirm the bootloader stays in
+  its coded error pattern rather than branching;
+- set a reset vector without the Thumb bit and confirm five-pulse rejection;
+- set a reset vector outside the application partition and confirm six-pulse
+  rejection.

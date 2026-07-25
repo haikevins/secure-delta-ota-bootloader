@@ -1,6 +1,6 @@
 # Boot and Update State Machine
 
-Status: **Frozen for Phase 0**
+Status: **Phase 0 design frozen; Phase 2 active-application validation and jump implemented**
 
 ## 1. Update states
 
@@ -145,7 +145,7 @@ Internal metadata is deliberately small and boot-critical. Phase 1 will decide w
 
 Before jump, bootloader checks at minimum:
 
-- initial MSP lies inside `0x20000000`–`0x20004FFF` and is aligned;
+- initial MSP lies inside `0x20000000`–`0x20005000` (top-of-stack inclusive) and is 8-byte aligned;
 - reset handler lies inside the application Flash region and has Thumb bit set;
 - application size from trusted metadata is nonzero and within bounds;
 - installed image hash matches trusted metadata when state requires it.

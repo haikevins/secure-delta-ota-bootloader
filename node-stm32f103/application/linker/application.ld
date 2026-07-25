@@ -18,9 +18,11 @@ SECTIONS
 {
     .isr_vector :
     {
-        . = ALIGN(4);
+        . = ALIGN(0x200);
+        __vector_table_start__ = .;
         KEEP(*(.isr_vector))
         . = ALIGN(4);
+        __vector_table_end__ = .;
     } > FLASH
 
     .text :
@@ -93,4 +95,6 @@ SECTIONS
 
 ASSERT(ORIGIN(FLASH) == 0x08006000, "Application Flash origin changed")
 ASSERT((ORIGIN(FLASH) + LENGTH(FLASH)) == 0x0800FC00, "Application must end at metadata page")
+ASSERT(__vector_table_start__ == 0x08006000, "Application vector table must begin at Flash origin")
+ASSERT(_etext <= 0x0800FC00, "Application code exceeds its Flash partition")
 ASSERT(_ebss <= (_estack - _Min_Stack_Size), "Application RAM overflow")

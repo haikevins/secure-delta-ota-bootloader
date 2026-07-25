@@ -1,19 +1,24 @@
+#include <stdint.h>
+
+#include "memory_map.h"
+#include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
 
-#define STATUS_LED_PORT GPIOC
-#define STATUS_LED_PIN  GPIO_Pin_13
+#define STATUS_LED_PORT          GPIOC
+#define STATUS_LED_PIN           GPIO_Pin_13
+#define HEARTBEAT_PERIOD_MS      1000UL
+#define HEARTBEAT_ON_TIME_MS     100UL
+#define ERROR_TOGGLE_DELAY       180000UL
 
-static void Phase1_Delay(volatile uint32_t cycles)
+volatile uint32_t g_application_tick_ms;
+
+void SysTick_Handler(void)
 {
-    while (cycles > 0UL)
-    {
-        __NOP();
-        --cycles;
-    }
+    ++g_application_tick_ms;
 }
 
-int main(void)
+static void Application_LedInit(void)
 {
     GPIO_InitTypeDef gpio;
 
@@ -23,12 +28,62 @@ int main(void)
     gpio.GPIO_Speed = GPIO_Speed_2MHz;
     gpio.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_Init(STATUS_LED_PORT, &gpio);
+    GPIO_SetBits(STATUS_LED_PORT, STATUS_LED_PIN);
+}
+
+static void Application_LedSet(uint8_t enabled)
+{
+    if (enabled != 0U)
+    {
+        GPIO_ResetBits(STATUS_LED_PORT, STATUS_LED_PIN);
+    }
+    else
+    {
+        GPIO_SetBits(STATUS_LED_PORT, STATUS_LED_PIN);
+    }
+}
+
+static void Application_FatalBlink(void) __attribute__((noreturn));
+
+static void Application_FatalBlink(void)
+{
+    for (;;)
+    {
+        volatile uint32_t delay;
+
+        GPIO_WriteBit(STATUS_LED_PORT,
+                      STATUS_LED_PIN,
+                      (BitAction)(1UL - (GPIO_ReadOutputDataBit(
+                          STATUS_LED_PORT,
+                          STATUS_LED_PIN))));
+
+        for (delay = 0UL; delay < ERROR_TOGGLE_DELAY; ++delay)
+        {
+            __NOP();
+        }
+    }
+}
+
+int main(void)
+{
+    Application_LedInit();
+
+    /* This self-check makes a wrong VTOR handoff visible before interrupts are
+     * enabled. SystemInit() must relocate VTOR to the application image. */
+    if (SCB->VTOR != APPLICATION_START_ADDRESS)
+    {
+        Application_FatalBlink();
+    }
+
+    if (SysTick_Config(SystemCoreClock / 1000UL) != 0UL)
+    {
+        Application_FatalBlink();
+    }
 
     for (;;)
     {
-        GPIO_WriteBit(STATUS_LED_PORT, STATUS_LED_PIN, Bit_RESET);
-        Phase1_Delay(250000UL);
-        GPIO_WriteBit(STATUS_LED_PORT, STATUS_LED_PIN, Bit_SET);
-        Phase1_Delay(1250000UL);
+        const uint32_t phase = g_application_tick_ms % HEARTBEAT_PERIOD_MS;
+        Application_LedSet((uint8_t)(phase < HEARTBEAT_ON_TIME_MS));
+        __WFI();
     }
 }

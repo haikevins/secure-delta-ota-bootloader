@@ -1,12 +1,13 @@
 flowchart TD
-    R[Reset] --> M[Read redundant metadata]
-    M --> D{State?}
-    D -->|IDLE/RECEIVING| V[Validate active application]
-    D -->|ARTIFACT_READY| C[Verify container]
-    D -->|INSTALLING| I[Resume install]
-    D -->|TRIAL_BOOT failed| B[Rollback]
-    V --> J[Jump application]
-    C --> P[Patch or extract target]
-    P --> K[Backup active image]
-    K --> I
-    I --> T[Trial boot]
+    R[Reset at 0x08000000] --> C[Bootloader SystemInit]
+    C --> L[PC13 startup window]
+    L --> V[Read application MSP and reset vector at 0x08006000]
+    V --> Q{Vectors valid?}
+    Q -->|No| E[Repeat coded LED error]
+    Q -->|Yes| S[Stop SysTick and clear NVIC]
+    S --> D[RCC DeInit]
+    D --> T[Set VTOR to 0x08006000]
+    T --> H[Assembly handoff: set MSP and reset masks]
+    H --> A[Branch to application Reset_Handler]
+    A --> I[Application SystemInit]
+    I --> Y[Application SysTick heartbeat]

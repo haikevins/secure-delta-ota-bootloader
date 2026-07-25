@@ -23,7 +23,7 @@ SHARED_DIR     := $(ROOT_DIR)/shared
 BUILD_DIR ?= build
 OUT_DIR   ?= out
 
-ifeq ($(origin TOOLCHAIN), undefined)
+ifeq ($(strip $(TOOLCHAIN)),)
   ifneq ($(shell command -v arm-none-eabi-gcc 2>/dev/null),)
     TOOLCHAIN := gcc
   else ifneq ($(shell command -v clang 2>/dev/null),)

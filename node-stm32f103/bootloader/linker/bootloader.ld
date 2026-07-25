@@ -17,9 +17,11 @@ SECTIONS
 {
     .isr_vector :
     {
-        . = ALIGN(4);
+        . = ALIGN(0x200);
+        __vector_table_start__ = .;
         KEEP(*(.isr_vector))
         . = ALIGN(4);
+        __vector_table_end__ = .;
     } > FLASH
 
     .text :
@@ -92,4 +94,6 @@ SECTIONS
 
 ASSERT(ORIGIN(FLASH) == 0x08000000, "Bootloader Flash origin changed")
 ASSERT(LENGTH(FLASH) == 24K, "Bootloader Flash budget must remain 24 KiB")
+ASSERT(__vector_table_start__ == 0x08000000, "Bootloader vector table must begin at Flash origin")
+ASSERT(_etext <= 0x08006000, "Bootloader code exceeds its Flash partition")
 ASSERT(_ebss <= (_estack - _Min_Stack_Size), "Bootloader RAM overflow")

@@ -24,7 +24,7 @@ else
     unset TOOLCHAIN
 fi
 
-make -C "$ROOT_DIR" bootloader "${MAKE_ARGS[@]}"
-IMAGE="$ROOT_DIR/node-stm32f103/bootloader/out/bootloader.hex"
+make -C "$ROOT_DIR" combined "${MAKE_ARGS[@]}"
+IMAGE="$ROOT_DIR/dist/secure-delta-ota-phase2.bin"
 "$OPENOCD_BIN" -f "$INTERFACE_CFG" -f "$TARGET_CFG" \
-    -c "program $IMAGE verify reset exit"
+    -c "program $IMAGE 0x08000000 verify reset exit"

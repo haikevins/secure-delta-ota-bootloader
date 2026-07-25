@@ -6,62 +6,96 @@ Secure Delta OTA reference project for **STM32F103C8T6 + ESP32 + external SPI NO
 
 - **Phase 0 — Specification Freeze:** complete.
 - **Phase 1 — Repository and Build Foundation:** complete.
-- **Phase 2 — Bootloader Jump to Application:** not implemented yet.
+- **Phase 2 — Bootloader Jump to Application:** complete.
+- **Phase 3 — Metadata and Boot Decision:** not implemented yet.
 
 The STM32 code uses the **STM32 Standard Peripheral Library (SPL)** and CMSIS,
-not HAL. The current bootloader and application are independent, buildable
-heartbeat images used to verify the toolchain, startup code, linker layout and
-SPL integration.
+not HAL.
 
-## Chosen architecture
+## Current boot flow
 
 ```text
-Firmware Server / CI
-    | MQTT notification + HTTPS download
-    v
-ESP32 Gateway
-    | Custom UART OTA protocol: COBS + CRC32 + ACK/NACK + resume
-    v
-STM32F103C8T6 Application
-    | stores update artifact
-    v
-External W25Q32 SPI NOR Flash
-    | reset into bootloader
-    v
-STM32F103C8T6 Secure Bootloader
-    | verify -> patch/full reconstruction -> backup -> install -> trial boot -> rollback
-    v
-STM32 Application
+Reset at 0x08000000
+        |
+        v
+Bootloader clock + PC13 startup indication
+        |
+        v
+Validate application vectors at 0x08006000
+        |
+        +-- invalid --> repeat LED error code
+        |
+        v
+Stop SysTick, clear NVIC, deinit RCC
+        |
+        v
+Set VTOR and MSP, branch to application Reset_Handler
+        |
+        v
+Application configures its own clock and SysTick
+        |
+        v
+100 ms PC13 heartbeat every second
 ```
 
-## Phase 1 build
+## Build and verify Phase 2
 
-The build automatically prefers `arm-none-eabi-gcc`. When GNU Arm Embedded GCC
-is unavailable, it can use `clang`, `ld.lld` and `llvm-objcopy`.
+The build prefers `arm-none-eabi-gcc` and falls back to Clang/LLD.
 
 ```bash
-make phase1-check
+make phase2-check
 ```
 
-Other targets:
+Explicit toolchain:
+
+```bash
+make phase2-check TOOLCHAIN=gcc
+make phase2-check TOOLCHAIN=clang
+```
+
+An unset or empty `TOOLCHAIN` value uses automatic detection. This means both
+commands below are valid when GNU Arm GCC is installed:
+
+```bash
+make flash-combined
+TOOLCHAIN="" make flash-combined
+```
+
+See `docs/toolchain-selection.md` for the propagation rules and troubleshooting.
+
+Other useful targets:
 
 ```bash
 make bootloader
 make application
 make firmware
-make toolchain-info
+make combined
+make flash-bootloader
+make flash-application
+make flash-combined
 make clean
 ```
 
-Explicit toolchain selection:
+`make combined` creates:
 
-```bash
-make phase1-check TOOLCHAIN=gcc
-make phase1-check TOOLCHAIN=clang
+```text
+dist/secure-delta-ota-phase2.bin
+dist/secure-delta-ota-phase2.txt
 ```
 
-Each STM32 image produces ELF, BIN, HEX, MAP and size-report artifacts in its
-local `out/` directory.
+The combined binary is flashed at `0x08000000`; its application bytes are
+placed at offset `0x6000`. The metadata page is left erased.
+
+## Expected hardware behavior
+
+After `make flash-combined`:
+
+1. bootloader: five fast PC13 flashes;
+2. one-second pause;
+3. application: one short PC13 flash each second.
+
+The application pattern uses SysTick and therefore verifies that the relocated
+vector table works after the jump.
 
 ## Internal Flash map
 
@@ -79,18 +113,14 @@ local `out/` directory.
 
 - `docs/architecture.md`
 - `docs/memory-map.md`
+- `docs/boot-jump.md`
+- `docs/boot-state-machine.md`
 - `docs/uart-ota-protocol.md`
 - `docs/firmware-container.md`
-- `docs/boot-state-machine.md`
 - `docs/threat-model.md`
 - `docs/release-process.md`
 - `docs/test-plan.md`
+- `docs/toolchain-selection.md`
 - `docs/phase-0-checklist.md`
 - `docs/phase-1-checklist.md`
-
-## Current hardware behavior
-
-The Phase 1 bootloader and application each configure PC13 as an active-low
-status LED and blink with different patterns. They are intended to be flashed
-and tested independently. The bootloader does not jump to the application until
-Phase 2.
+- `docs/phase-2-checklist.md`

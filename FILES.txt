@@ -5,8 +5,10 @@
 LICENSE
 Makefile
 PHASE1_REPORT.md
+PHASE2_REPORT.md
 README.md
 docs/architecture.md
+docs/boot-jump.md
 docs/boot-state-machine.md
 docs/diagrams/boot-flow.mmd
 docs/diagrams/memory-map.mmd
@@ -16,9 +18,11 @@ docs/firmware-container.md
 docs/memory-map.md
 docs/phase-0-checklist.md
 docs/phase-1-checklist.md
+docs/phase-2-checklist.md
 docs/release-process.md
 docs/test-plan.md
 docs/threat-model.md
+docs/toolchain-selection.md
 docs/uart-ota-protocol.md
 gateway-esp32/CMakeLists.txt
 gateway-esp32/components/artifact_cache/README.md
@@ -96,6 +100,7 @@ node-stm32f103/bootloader/src/image_validator.c
 node-stm32f103/bootloader/src/main.c
 node-stm32f103/bootloader/src/rollback_manager.c
 node-stm32f103/bootloader/src/update_recovery.c
+node-stm32f103/bootloader/startup/application_handoff.s
 node-stm32f103/bootloader/startup/startup_stm32f10x_md.s
 node-stm32f103/bootloader/storage/artifact_storage.c
 node-stm32f103/bootloader/storage/image_storage.c
@@ -198,8 +203,10 @@ scripts/build_all.sh
 scripts/create_release.sh
 scripts/flash_application.sh
 scripts/flash_bootloader.sh
+scripts/flash_combined.sh
 scripts/phase0_check.py
 scripts/phase1_check.py
+scripts/phase2_check.py
 scripts/run_tests.sh
 server/README.md
 server/app/api/.gitkeep
@@ -240,6 +247,7 @@ tools/create_delta_patch.py
 tools/create_full_container.py
 tools/generate_version.py
 tools/inspect_container.py
+tools/merge_phase2_images.py
 tools/power_cut_test.py
 tools/sign_container.py
 tools/uart_ota_sender.py
