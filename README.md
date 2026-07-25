@@ -4,7 +4,14 @@ Secure Delta OTA reference project for **STM32F103C8T6 + ESP32 + external SPI NO
 
 ## Project status
 
-This archive completes **Phase 0 — Specification Freeze** only. It intentionally contains a repository skeleton and interface placeholders; production firmware is not implemented yet.
+- **Phase 0 — Specification Freeze:** complete.
+- **Phase 1 — Repository and Build Foundation:** complete.
+- **Phase 2 — Bootloader Jump to Application:** not implemented yet.
+
+The STM32 code uses the **STM32 Standard Peripheral Library (SPL)** and CMSIS,
+not HAL. The current bootloader and application are independent, buildable
+heartbeat images used to verify the toolchain, startup code, linker layout and
+SPL integration.
 
 ## Chosen architecture
 
@@ -27,25 +34,48 @@ STM32F103C8T6 Secure Bootloader
 STM32 Application
 ```
 
-## Fixed Phase 0 decisions
+## Phase 1 build
 
-- MCU: STM32F103C8T6, Cortex-M3, 64 KiB internal Flash, 20 KiB SRAM.
-- STM32 framework: Standard Peripheral Library (SPL), not HAL.
-- Gateway: ESP32 using ESP-IDF.
-- OTA network path: MQTT notification and HTTPS artifact download.
-- Gateway-to-node transport: custom UART protocol; LoRa is not used.
-- UART framing: COBS with `0x00` delimiter.
-- UART initial configuration: USART1, 115200 baud, 8-N-1, no flow control.
-- OTA payload per DATA packet: 256 bytes maximum.
-- External storage: W25Q32, 4 MiB SPI NOR Flash.
-- Delta generation: JojoDiff-compatible host tool.
-- Delta application: janpatch-compatible streaming patch adapter.
-- Integrity progression: packet CRC32, artifact CRC32, SHA-256.
-- Authenticity target: signed container verified by bootloader; no AES in the first secure release.
-- Internal application start: `0x08006000`.
-- Boot metadata page: `0x0800FC00`–`0x0800FFFF`.
+The build automatically prefers `arm-none-eabi-gcc`. When GNU Arm Embedded GCC
+is unavailable, it can use `clang`, `ld.lld` and `llvm-objcopy`.
 
-## Phase 0 documents
+```bash
+make phase1-check
+```
+
+Other targets:
+
+```bash
+make bootloader
+make application
+make firmware
+make toolchain-info
+make clean
+```
+
+Explicit toolchain selection:
+
+```bash
+make phase1-check TOOLCHAIN=gcc
+make phase1-check TOOLCHAIN=clang
+```
+
+Each STM32 image produces ELF, BIN, HEX, MAP and size-report artifacts in its
+local `out/` directory.
+
+## Internal Flash map
+
+```text
+0x08000000 +---------------------------+
+           | Bootloader: 24 KiB        |
+0x08006000 +---------------------------+
+           | Application: 39 KiB       |
+0x0800FC00 +---------------------------+
+           | Boot metadata: 1 KiB      |
+0x08010000 +---------------------------+
+```
+
+## Documentation
 
 - `docs/architecture.md`
 - `docs/memory-map.md`
@@ -56,7 +86,11 @@ STM32 Application
 - `docs/release-process.md`
 - `docs/test-plan.md`
 - `docs/phase-0-checklist.md`
+- `docs/phase-1-checklist.md`
 
-## Build status
+## Current hardware behavior
 
-The Makefiles are orchestration placeholders. Phase 1 will add startup code, linker scripts, SPL/CMSIS sources, compiler configuration and reproducible builds.
+The Phase 1 bootloader and application each configure PC13 as an active-low
+status LED and blink with different patterns. They are intended to be flashed
+and tested independently. The bootloader does not jump to the application until
+Phase 2.

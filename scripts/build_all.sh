@@ -1,3 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "build_all.sh: implementation is scheduled for a later roadmap phase."
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+if [[ -n "${TOOLCHAIN:-}" ]]; then
+    make firmware "TOOLCHAIN=${TOOLCHAIN}"
+else
+    make firmware
+fi

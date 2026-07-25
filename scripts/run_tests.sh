@@ -1,3 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "run_tests.sh: implementation is scheduled for a later roadmap phase."
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+if [[ -n "${TOOLCHAIN:-}" ]]; then
+    make phase1-check "TOOLCHAIN=${TOOLCHAIN}"
+else
+    make phase1-check
+fi
