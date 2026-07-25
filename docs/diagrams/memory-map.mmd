@@ -1,0 +1,14 @@
+flowchart TB
+    subgraph Internal[STM32 Internal Flash 64 KiB]
+      BL[Bootloader 24 KiB\n0x08000000-0x08005FFF]
+      APP[Application 39 KiB\n0x08006000-0x0800FBFF]
+      META[Metadata 1 KiB\n0x0800FC00-0x0800FFFF]
+    end
+    subgraph External[W25Q32 4 MiB]
+      EMA[Metadata A/B 8 KiB]
+      INC[Incoming 128 KiB]
+      REC[Reconstructed 128 KiB]
+      BAK[Backup 128 KiB]
+      LOG[Logs 64 KiB]
+      RSV[Reserved]
+    end

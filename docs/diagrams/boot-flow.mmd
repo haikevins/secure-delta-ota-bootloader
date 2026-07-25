@@ -1,0 +1,12 @@
+flowchart TD
+    R[Reset] --> M[Read redundant metadata]
+    M --> D{State?}
+    D -->|IDLE/RECEIVING| V[Validate active application]
+    D -->|ARTIFACT_READY| C[Verify container]
+    D -->|INSTALLING| I[Resume install]
+    D -->|TRIAL_BOOT failed| B[Rollback]
+    V --> J[Jump application]
+    C --> P[Patch or extract target]
+    P --> K[Backup active image]
+    K --> I
+    I --> T[Trial boot]

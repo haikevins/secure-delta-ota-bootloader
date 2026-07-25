@@ -1,0 +1,12 @@
+name: Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  phase0-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Phase 0 check
+        run: python3 scripts/phase0_check.py

@@ -1,0 +1,8 @@
+flowchart TD
+    CI[Firmware Development / CI] -->|HTTPS artifacts| GW[ESP32 Gateway]
+    CI -->|MQTT notification| GW
+    GW -->|Custom UART OTA| APP[STM32 Application]
+    APP -->|SPI storage| EXT[W25Q32 External Flash]
+    APP -->|Reset request| BL[STM32 Secure Bootloader]
+    BL -->|Read artifact / backup / reconstructed image| EXT
+    BL -->|Install and jump| APP

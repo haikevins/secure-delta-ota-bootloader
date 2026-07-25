@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant S as Server
+    participant E as ESP32
+    participant A as STM32 App
+    participant B as Bootloader
+    S->>E: MQTT update notification
+    E->>S: HTTPS manifest/artifact
+    E->>A: HELLO / QUERY
+    A-->>E: version, state, resume offset
+    E->>A: START + DATA...
+    A-->>E: ACK/NACK
+    E->>A: FINISH / INSTALL
+    A->>B: Reset
+    B->>B: Verify, reconstruct, backup, install
+    B->>A: Trial boot
+    A->>B: Confirm application
