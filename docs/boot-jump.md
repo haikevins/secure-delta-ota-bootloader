@@ -6,7 +6,7 @@
 Bootloader vector table   0x08000000
 Application vector table  0x08006000
 Application end           0x0800FBFF
-Metadata page             0x0800FC00
+Metadata page             0x0800F800
 SRAM                      0x20000000–0x20004FFF
 Initial top of stack      0x20005000
 ```

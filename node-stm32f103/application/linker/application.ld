@@ -1,12 +1,12 @@
 /* STM32F103C8T6 relocatable application linker script.
  * The application begins after the 24 KiB bootloader and ends before the
- * final 1 KiB internal metadata page.
+ * final two 1 KiB internal metadata pages.
  */
 ENTRY(Reset_Handler)
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08006000, LENGTH = 39K
+    FLASH (rx)  : ORIGIN = 0x08006000, LENGTH = 38K
     RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 20K
 }
 
@@ -94,7 +94,7 @@ SECTIONS
 }
 
 ASSERT(ORIGIN(FLASH) == 0x08006000, "Application Flash origin changed")
-ASSERT((ORIGIN(FLASH) + LENGTH(FLASH)) == 0x0800FC00, "Application must end at metadata page")
+ASSERT((ORIGIN(FLASH) + LENGTH(FLASH)) == 0x0800F800, "Application must end at metadata page")
 ASSERT(__vector_table_start__ == 0x08006000, "Application vector table must begin at Flash origin")
-ASSERT(_etext <= 0x0800FC00, "Application code exceeds its Flash partition")
+ASSERT(_etext <= 0x0800F800, "Application code exceeds its Flash partition")
 ASSERT(_ebss <= (_estack - _Min_Stack_Size), "Application RAM overflow")

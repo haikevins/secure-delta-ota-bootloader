@@ -1,6 +1,6 @@
 # Boot and Update State Machine
 
-Status: **Phase 0 design frozen; Phase 2 active-application validation and jump implemented**
+Status: **Phase 3 metadata validation, redundancy and boot decision implemented**
 
 ## 1. Update states
 
@@ -137,9 +137,7 @@ typedef struct
 } BootMetadata_t;
 ```
 
-External Flash contains Metadata A and B in separate erase sectors. A new record is written to the older/invalid copy, verified, then selected by its larger generation counter.
-
-Internal metadata is deliberately small and boot-critical. Phase 1 will decide whether it contains the complete record or an emergency recovery record pointing to external metadata; either choice must remain compatible with the fixed 1 KiB region.
+Internal Flash contains complete Metadata A and B records in separate 1 KiB erase pages at `0x0800F800` and `0x0800FC00`. A new record is written to the older/invalid page, read back, CRC-validated and byte-compared. The currently selected page is not erased until a newer verified copy exists. External metadata remains reserved for later extended state.
 
 ## 5. Application validity
 

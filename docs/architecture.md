@@ -1,6 +1,6 @@
 # System Architecture Specification
 
-Status: **Frozen for Phase 0**
+Status: **Frozen for Phase 3**
 
 ## 1. Objective
 

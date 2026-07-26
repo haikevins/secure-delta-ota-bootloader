@@ -35,7 +35,7 @@ EXPECTED = {
     },
     "application": {
         "vector": 0x08006000,
-        "budget": 39 * 1024,
+        "budget": 38 * 1024,
     },
 }
 

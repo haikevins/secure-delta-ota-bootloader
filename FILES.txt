@@ -2,10 +2,13 @@
 .github/workflows/release.yml
 .github/workflows/test.yml
 .gitignore
+FILES.txt
 LICENSE
 Makefile
 PHASE1_REPORT.md
 PHASE2_REPORT.md
+PHASE3_REPORT.md
+PHASE3_VALIDATION.txt
 README.md
 docs/architecture.md
 docs/boot-jump.md
@@ -16,9 +19,11 @@ docs/diagrams/system-architecture.mmd
 docs/diagrams/update-flow.mmd
 docs/firmware-container.md
 docs/memory-map.md
+docs/metadata-and-boot-decision.md
 docs/phase-0-checklist.md
 docs/phase-1-checklist.md
 docs/phase-2-checklist.md
+docs/phase-3-checklist.md
 docs/release-process.md
 docs/test-plan.md
 docs/threat-model.md
@@ -82,9 +87,11 @@ node-stm32f103/bootloader/drivers/spi_flash.c
 node-stm32f103/bootloader/drivers/uart_debug.c
 node-stm32f103/bootloader/drivers/watchdog.c
 node-stm32f103/bootloader/include/application_jump.h
+node-stm32f103/bootloader/include/boot_decision.h
 node-stm32f103/bootloader/include/boot_manager.h
 node-stm32f103/bootloader/include/image_installer.h
 node-stm32f103/bootloader/include/image_validator.h
+node-stm32f103/bootloader/include/metadata_storage.h
 node-stm32f103/bootloader/include/rollback_manager.h
 node-stm32f103/bootloader/include/update_recovery.h
 node-stm32f103/bootloader/linker/bootloader.ld
@@ -94,6 +101,7 @@ node-stm32f103/bootloader/platform/critical_section.c
 node-stm32f103/bootloader/platform/interrupt.c
 node-stm32f103/bootloader/platform/system_clock.c
 node-stm32f103/bootloader/src/application_jump.c
+node-stm32f103/bootloader/src/boot_decision.c
 node-stm32f103/bootloader/src/boot_manager.c
 node-stm32f103/bootloader/src/image_installer.c
 node-stm32f103/bootloader/src/image_validator.c
@@ -201,12 +209,15 @@ node-stm32f103/spl/src/stm32f10x_usart.c
 node-stm32f103/spl/src/stm32f10x_wwdg.c
 scripts/build_all.sh
 scripts/create_release.sh
+scripts/dump_metadata.sh
+scripts/erase_metadata.sh
 scripts/flash_application.sh
 scripts/flash_bootloader.sh
 scripts/flash_combined.sh
 scripts/phase0_check.py
 scripts/phase1_check.py
 scripts/phase2_check.py
+scripts/phase3_check.py
 scripts/run_tests.sh
 server/README.md
 server/app/api/.gitkeep
@@ -221,6 +232,7 @@ server/app/storage/.gitkeep
 server/requirements.txt
 server/tests/.gitkeep
 shared/include/boot_metadata.h
+shared/include/crc32.h
 shared/include/firmware_container.h
 shared/include/firmware_version.h
 shared/include/memory_map.h
@@ -236,6 +248,7 @@ tests/hardware-in-loop/.gitkeep
 tests/integration/.gitkeep
 tests/protocol-vectors/.gitkeep
 tests/unit/.gitkeep
+tests/unit/test_phase3_metadata.c
 third_party/janpatch/README.md
 third_party/jojodiff/README.md
 third_party/sha256/README.md
@@ -247,6 +260,8 @@ tools/create_delta_patch.py
 tools/create_full_container.py
 tools/generate_version.py
 tools/inspect_container.py
+tools/inspect_metadata.py
+tools/merge_images.py
 tools/merge_phase2_images.py
 tools/power_cut_test.py
 tools/sign_container.py

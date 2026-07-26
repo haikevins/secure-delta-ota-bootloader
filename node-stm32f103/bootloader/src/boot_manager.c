@@ -3,20 +3,25 @@
 #include <stdint.h>
 
 #include "application_jump.h"
+#include "boot_decision.h"
+#include "boot_metadata.h"
+#include "metadata_storage.h"
 #include "memory_map.h"
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
 
-#define STATUS_LED_PORT           GPIOC
-#define STATUS_LED_PIN            GPIO_Pin_13
-#define STARTUP_BLINK_COUNT       5UL
-#define STARTUP_ON_TIME_MS        100UL
-#define STARTUP_OFF_TIME_MS       100UL
-#define STARTUP_FINAL_PAUSE_MS    1000UL
-#define ERROR_ON_TIME_MS          120UL
-#define ERROR_OFF_TIME_MS         180UL
-#define ERROR_PAUSE_MS            900UL
+#define STATUS_LED_PORT             GPIOC
+#define STATUS_LED_PIN              GPIO_Pin_13
+#define STARTUP_BLINK_COUNT         5UL
+#define STARTUP_ON_TIME_MS          100UL
+#define STARTUP_OFF_TIME_MS         100UL
+#define STARTUP_FINAL_PAUSE_MS      1000UL
+#define ERROR_ON_TIME_MS            120UL
+#define ERROR_OFF_TIME_MS           180UL
+#define ERROR_PAUSE_MS              900UL
+#define METADATA_ERROR_PULSES       8UL
+#define RECOVERY_ACTION_PULSES      9UL
 
 static volatile uint32_t g_boot_tick_ms;
 
@@ -36,7 +41,6 @@ static void BootManager_LedInit(void)
     gpio.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_Init(STATUS_LED_PORT, &gpio);
 
-    /* The Blue Pill PC13 LED is active low. */
     GPIO_SetBits(STATUS_LED_PORT, STATUS_LED_PIN);
 }
 
@@ -77,43 +81,34 @@ static void BootManager_ShowStartupWindow(void)
     BootManager_DelayMs(STARTUP_FINAL_PAUSE_MS);
 }
 
-static uint32_t BootManager_ErrorPulseCount(
+static uint32_t BootManager_ApplicationErrorPulseCount(
     ApplicationValidationStatus_t status)
 {
     switch (status)
     {
         case APPLICATION_VALIDATION_BAD_VECTOR_ALIGNMENT:
             return 1UL;
-
         case APPLICATION_VALIDATION_BAD_VECTOR_RANGE:
             return 2UL;
-
         case APPLICATION_VALIDATION_BAD_STACK_RANGE:
             return 3UL;
-
         case APPLICATION_VALIDATION_BAD_STACK_ALIGNMENT:
             return 4UL;
-
         case APPLICATION_VALIDATION_BAD_RESET_THUMB_BIT:
             return 5UL;
-
         case APPLICATION_VALIDATION_BAD_RESET_RANGE:
             return 6UL;
-
         case APPLICATION_VALIDATION_OK:
         default:
             return 7UL;
     }
 }
 
-static void BootManager_ShowFatalError(
-    ApplicationValidationStatus_t status) __attribute__((noreturn));
+static void BootManager_ShowFatalPulses(uint32_t pulse_count)
+    __attribute__((noreturn));
 
-static void BootManager_ShowFatalError(
-    ApplicationValidationStatus_t status)
+static void BootManager_ShowFatalPulses(uint32_t pulse_count)
 {
-    const uint32_t pulse_count = BootManager_ErrorPulseCount(status);
-
     for (;;)
     {
         uint32_t pulse;
@@ -130,26 +125,76 @@ static void BootManager_ShowFatalError(
     }
 }
 
+static uint8_t BootManager_ActionCanJump(BootAction_t action)
+{
+    return (uint8_t)((action == BOOT_ACTION_JUMP_ACTIVE) ||
+                     (action == BOOT_ACTION_RESUME_DOWNLOAD) ||
+                     (action == BOOT_ACTION_BOOT_TRIAL));
+}
+
 void BootManager_Run(void)
 {
     ApplicationVector_t application_vector;
-    ApplicationValidationStatus_t validation_status;
+    ApplicationValidationStatus_t application_status;
+    BootMetadata_t metadata;
+    BootMetadata_t committed_metadata;
+    BootMetadataSlot_t active_slot;
+    MetadataStorageStatus_t storage_status;
+    BootDecision_t decision;
+    uint8_t application_valid;
 
     BootManager_LedInit();
 
     if (SysTick_Config(SystemCoreClock / 1000UL) != 0UL)
     {
-        BootManager_ShowFatalError(APPLICATION_VALIDATION_OK);
+        BootManager_ShowFatalPulses(7UL);
     }
 
-    validation_status = ApplicationJump_Validate(APPLICATION_START_ADDRESS,
-                                                 &application_vector);
-    if (validation_status != APPLICATION_VALIDATION_OK)
+    storage_status = MetadataStorage_Load(&metadata, &active_slot);
+    if (storage_status == METADATA_STORAGE_DEFAULTS_USED)
     {
-        BootManager_ShowFatalError(validation_status);
+        storage_status = MetadataStorage_Commit(&metadata,
+                                                &committed_metadata,
+                                                &active_slot);
+        if (storage_status == METADATA_STORAGE_OK)
+        {
+            metadata = committed_metadata;
+        }
+        else
+        {
+            /* Metadata failure must not brick a previously valid product image
+             * during Phase 3. Use a finalized RAM default for this boot only. */
+            metadata.generation = BOOT_METADATA_FIRST_GENERATION;
+            BootMetadata_Finalize(&metadata);
+        }
+    }
+    else if (storage_status != METADATA_STORAGE_OK)
+    {
+        BootManager_ShowFatalPulses(METADATA_ERROR_PULSES);
     }
 
-    /* Visible two-second bootloader window before handing control to the app. */
-    BootManager_ShowStartupWindow();
-    ApplicationJump_Execute(&application_vector);
+    application_status = ApplicationJump_Validate(APPLICATION_START_ADDRESS,
+                                                   &application_vector);
+    application_valid = (uint8_t)(application_status ==
+                                  APPLICATION_VALIDATION_OK);
+
+    decision = BootDecision_Evaluate(&metadata, application_valid);
+
+    if (BootManager_ActionCanJump(decision.action) != 0U)
+    {
+        BootManager_ShowStartupWindow();
+        ApplicationJump_Execute(&application_vector);
+    }
+
+    if ((application_valid == 0U) &&
+        (decision.reason == BOOT_DECISION_REASON_APPLICATION_INVALID))
+    {
+        BootManager_ShowFatalPulses(
+            BootManager_ApplicationErrorPulseCount(application_status));
+    }
+
+    /* Update recovery actions are deliberately selected but not executed until
+     * their owning phases. Remaining in the bootloader is safer than silently
+     * jumping while an install/rollback state is pending. */
+    BootManager_ShowFatalPulses(RECOVERY_ACTION_PULSES);
 }

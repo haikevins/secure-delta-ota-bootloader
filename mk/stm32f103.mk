@@ -104,7 +104,8 @@ LDFLAGS := $(ARCH_FLAGS) $(TOOLCHAIN_LINK_FLAGS) \
 SPL_C_SOURCES := \
   $(SPL_DIR)/src/misc.c \
   $(SPL_DIR)/src/stm32f10x_gpio.c \
-  $(SPL_DIR)/src/stm32f10x_rcc.c
+  $(SPL_DIR)/src/stm32f10x_rcc.c \
+  $(LOCAL_SPL_C_SOURCES)
 
 C_SOURCES := $(LOCAL_C_SOURCES) $(SPL_C_SOURCES)
 ASM_SOURCES := $(LOCAL_ASM_SOURCES)

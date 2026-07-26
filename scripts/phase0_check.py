@@ -29,7 +29,7 @@ if missing:
     sys.exit(1)
 
 # Frozen arithmetic checks.
-internal_kib = 24 + 39 + 1
+internal_kib = 24 + 38 + 1 + 1
 if internal_kib != 64:
     print(f"Phase 0 check: FAIL: internal map sums to {internal_kib} KiB")
     sys.exit(1)
@@ -52,5 +52,5 @@ for index in range(len(partitions) - 1):
 
 print("Secure Delta OTA Phase 0 specification check: PASS")
 print(f"Required specification files: {len(REQUIRED)}")
-print("Internal Flash allocation: 64 KiB")
+print("Internal Flash allocation: 64 KiB (24 + 38 + 1 + 1)")
 print("External Flash fixed allocation through: 0x071FFF")

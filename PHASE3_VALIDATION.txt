@@ -1,0 +1,36 @@
+Secure Delta OTA Bootloader — Phase 3 validation
+
+Automated result:
+  Phase 0 specification check: PASS
+  Phase 1 repository/build check: PASS
+  Phase 2 bootloader jump check: PASS
+  Phase 3 metadata host tests: PASS
+  Phase 3 metadata/boot-decision check: PASS
+
+Validated in archive-generation environment:
+  Toolchain: Clang/LLD for ARM embedded build
+  Native host compiler: C11 unit tests with -Werror
+  Bootloader Flash image: 3168 bytes (text + data)
+  Bootloader BSS: 1028 bytes
+  Application Flash image: 1140 bytes (text + data)
+  Application BSS: 1028 bytes
+  Bootloader partition: 24 KiB
+  Application partition: 38 KiB
+  Metadata A: 0x0800F800, 1 KiB
+  Metadata B: 0x0800FC00, 1 KiB
+
+Host tests cover:
+  IEEE CRC32 known vector
+  record validation and corruption rejection
+  redundant newest-slot selection
+  invalid-slot fallback
+  generation wrap-around
+  partial target write/power-loss model
+  state-to-boot-action mapping
+
+Hardware validation still required on STM32F103C8T6:
+  internal Flash erase/program behavior
+  first-boot metadata initialization
+  repeated reset behavior
+  deliberate A/B corruption and selection
+  physical power removal during metadata commit
