@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-   3684	      8	   1048	   4740	   1284	out-phase4-check/application.elf
+   3792	      8	   1576	   5376	   1500	out-phase4-check/application.elf

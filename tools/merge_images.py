@@ -36,7 +36,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "dist/secure-delta-ota-phase4.bin",
+        default=root / "dist/secure-delta-ota-phase5.bin",
     )
     args = parser.parse_args()
 
@@ -59,7 +59,7 @@ def main() -> None:
     manifest = args.output.with_suffix(".txt")
     manifest.write_text(
         "\n".join([
-            "Secure Delta OTA Phase 4 combined image",
+            "Secure Delta OTA Phase 5 combined image",
             f"flash_base=0x{FLASH_BASE:08X}",
             f"bootloader_size={len(bootloader)}",
             f"application_address=0x{APPLICATION_ADDRESS:08X}",

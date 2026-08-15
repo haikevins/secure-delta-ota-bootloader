@@ -1,6 +1,8 @@
 # Custom UART OTA Protocol Version 1
 
-Status: **Frozen for Phase 0**
+Status: **Protocol v1 frozen in Phase 0; UART/PC implementation added in Phase 5**
+
+Phase 5 uses same-boot resume only. Persistent power-loss recovery remains a later phase.
 
 ## 1. Physical UART configuration
 

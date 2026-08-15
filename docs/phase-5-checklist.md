@@ -1,0 +1,23 @@
+# Phase 5 Checklist
+
+- [x] USART1 PA9/PA10 at 115200 8-N-1.
+- [x] RX interrupt and 512-byte ring buffer.
+- [x] COBS + `0x00`.
+- [x] Little-endian packet serialization.
+- [x] Packet CRC32.
+- [x] HELLO/QUERY/STATUS.
+- [x] START/DATA/FINISH/ABORT.
+- [x] Same-boot RESUME.
+- [x] ACK/NACK.
+- [x] Sequence and offset rejection.
+- [x] Duplicate DATA retry.
+- [x] Idempotent FINISH retry.
+- [x] External Flash DATA write/verify.
+- [x] Full artifact CRC at FINISH.
+- [x] PC Python codec/client.
+- [x] Host C/Python tests.
+- [x] `make phase5-check`.
+- [x] `make phase5-hw-test PORT=...` runner.
+- [ ] Physical UART hardware test confirmed.
+- [ ] Persistent power-loss resume (later phase).
+- [ ] Firmware installation (Phase 6).

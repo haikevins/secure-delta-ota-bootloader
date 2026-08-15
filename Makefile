@@ -1,9 +1,11 @@
 TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
 
-.PHONY: all phase0-check phase1-check phase2-check phase3-check phase4-check phase4-hw-test bootloader application firmware combined \
-        flash-bootloader flash-application flash-combined dump-metadata erase-metadata gateway tools test release clean toolchain-info
+.PHONY: all phase0-check phase1-check phase2-check phase3-check phase4-check phase4-hw-test \
+        phase5-check phase5-hw-test bootloader application firmware combined \
+        flash-bootloader flash-application flash-combined dump-metadata erase-metadata \
+        gateway tools test release clean toolchain-info
 
-all: phase4-check
+all: phase5-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -23,6 +25,12 @@ phase4-check: phase3-check
 phase4-hw-test:
 	@$(TOOLCHAIN_ARG) python3 scripts/phase4_hw_test.py
 
+phase5-check: phase4-check
+	@$(TOOLCHAIN_ARG) python3 scripts/phase5_check.py
+
+phase5-hw-test:
+	@PORT="$(PORT)" python3 scripts/phase5_hw_test.py
+
 firmware: bootloader application
 
 bootloader:
@@ -35,33 +43,33 @@ combined: firmware
 	@python3 tools/merge_images.py
 
 flash-bootloader:
-	@scripts/flash_bootloader.sh
+	@bash scripts/flash_bootloader.sh
 
 flash-application:
-	@scripts/flash_application.sh
+	@bash scripts/flash_application.sh
 
 flash-combined:
-	@scripts/flash_combined.sh
+	@bash scripts/flash_combined.sh
 
 dump-metadata:
-	@scripts/dump_metadata.sh
+	@bash scripts/dump_metadata.sh
 
 erase-metadata:
-	@scripts/erase_metadata.sh
+	@bash scripts/erase_metadata.sh
 
 toolchain-info:
 	@$(MAKE) -C node-stm32f103/bootloader $(TOOLCHAIN_ARG) info
 
 gateway:
-	@echo "ESP32 build begins in Phase 9; Phase 4 covers external SPI Flash."
+	@echo "ESP32 integration starts in Phase 9."
 
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase4-check
+test: phase5-check
 
 release:
-	@echo "The signed release pipeline is implemented in Phase 15."
+	@echo "Signed release pipeline is Phase 15."
 
 clean:
 	@$(MAKE) -C node-stm32f103/bootloader clean

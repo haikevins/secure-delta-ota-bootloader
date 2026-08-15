@@ -69,6 +69,35 @@ bool ExternalFlashStorage_Verify(ExternalFlashPartition_t partition,
            SpiFlash_Verify(address, data, length);
 }
 
+
+bool ExternalFlashStorage_EraseRange(ExternalFlashPartition_t partition,
+                                     uint32_t offset,
+                                     uint32_t length)
+{
+    ExternalFlashPartitionInfo_t info;
+    uint32_t address;
+    uint32_t erased = 0UL;
+
+    if (!ExternalFlashStorage_GetPartition(partition, &info)) { return false; }
+    if ((length == 0UL) ||
+        !ExtFlash_IsRangeValid(info.size, offset, length) ||
+        !ExtFlash_IsSectorAligned(offset) ||
+        ((length & (EXT_FLASH_SECTOR_SIZE - 1UL)) != 0UL))
+    {
+        return false;
+    }
+
+    address = info.address + offset;
+    if (!ExtFlash_IsSectorAligned(address)) { return false; }
+
+    while (erased < length)
+    {
+        if (!SpiFlash_EraseSector(address + erased)) { return false; }
+        erased += EXT_FLASH_SECTOR_SIZE;
+    }
+    return true;
+}
+
 bool ExternalFlashStorage_ErasePartition(ExternalFlashPartition_t partition)
 {
     ExternalFlashPartitionInfo_t info;

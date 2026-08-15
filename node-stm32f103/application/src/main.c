@@ -1,6 +1,6 @@
 #include <stdint.h>
-
 #include "memory_map.h"
+#include "ota_agent.h"
 #include "phase4_flash_selftest.h"
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
@@ -22,7 +22,6 @@ void SysTick_Handler(void)
 static void Application_LedInit(void)
 {
     GPIO_InitTypeDef gpio;
-
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
     GPIO_StructInit(&gpio);
     gpio.GPIO_Pin = STATUS_LED_PIN;
@@ -34,14 +33,8 @@ static void Application_LedInit(void)
 
 static void Application_LedSet(uint8_t enabled)
 {
-    if (enabled != 0U)
-    {
-        GPIO_ResetBits(STATUS_LED_PORT, STATUS_LED_PIN);
-    }
-    else
-    {
-        GPIO_SetBits(STATUS_LED_PORT, STATUS_LED_PIN);
-    }
+    if (enabled != 0U) { GPIO_ResetBits(STATUS_LED_PORT, STATUS_LED_PIN); }
+    else { GPIO_SetBits(STATUS_LED_PORT, STATUS_LED_PIN); }
 }
 
 static void Application_FatalBlink(void) __attribute__((noreturn));
@@ -51,17 +44,10 @@ static void Application_FatalBlink(void)
     for (;;)
     {
         volatile uint32_t delay;
-
-        GPIO_WriteBit(STATUS_LED_PORT,
-                      STATUS_LED_PIN,
-                      (BitAction)(1UL - (GPIO_ReadOutputDataBit(
-                          STATUS_LED_PORT,
-                          STATUS_LED_PIN))));
-
-        for (delay = 0UL; delay < ERROR_TOGGLE_DELAY; ++delay)
-        {
-            __NOP();
-        }
+        GPIO_WriteBit(STATUS_LED_PORT, STATUS_LED_PIN,
+                      (BitAction)(1UL - GPIO_ReadOutputDataBit(
+                          STATUS_LED_PORT, STATUS_LED_PIN)));
+        for (delay = 0UL; delay < ERROR_TOGGLE_DELAY; ++delay) { __NOP(); }
     }
 }
 
@@ -69,13 +55,7 @@ int main(void)
 {
     Application_LedInit();
 
-    /* This self-check makes a wrong VTOR handoff visible before interrupts are
-     * enabled. SystemInit() must relocate VTOR to the application image. */
-    if (SCB->VTOR != APPLICATION_START_ADDRESS)
-    {
-        Application_FatalBlink();
-    }
-
+    if (SCB->VTOR != APPLICATION_START_ADDRESS) { Application_FatalBlink(); }
     if (SysTick_Config(SystemCoreClock / 1000UL) != 0UL)
     {
         Application_FatalBlink();
@@ -87,11 +67,16 @@ int main(void)
     {
         Application_FatalBlink();
     }
+#else
+    if (!OtaAgent_Init()) { Application_FatalBlink(); }
 #endif
 
     for (;;)
     {
         const uint32_t phase = g_application_tick_ms % HEARTBEAT_PERIOD_MS;
+#if !defined(PHASE4_HW_TEST)
+        OtaAgent_Process();
+#endif
         Application_LedSet((uint8_t)(phase < HEARTBEAT_ON_TIME_MS));
         __WFI();
     }

@@ -32,6 +32,9 @@ bool ExternalFlashStorage_Write(ExternalFlashPartition_t partition,
 bool ExternalFlashStorage_Verify(ExternalFlashPartition_t partition,
                                  uint32_t offset, const uint8_t *data, uint32_t length);
 bool ExternalFlashStorage_ErasePartition(ExternalFlashPartition_t partition);
+bool ExternalFlashStorage_EraseRange(ExternalFlashPartition_t partition,
+                                     uint32_t offset,
+                                     uint32_t length);
 bool ExternalFlashStorage_IsErased(ExternalFlashPartition_t partition,
                                    uint32_t offset, uint32_t length);
 
