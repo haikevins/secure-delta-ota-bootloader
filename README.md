@@ -20,6 +20,8 @@ STM32 uses **Standard Peripheral Library + CMSIS**, not HAL. ESP32 uses
 - Phase 10 — HTTPS download: complete + hardware verified.
 - Phase 11 — MQTT orchestration: complete + hardware verified.
 - Phase 12 — Delta patch generation: complete + host verified.
+- Phase 13 — STM32 delta patching: complete + hardware verified.
+- Phase 14 — Secure container/signature: implemented + host/build/security verified; physical HIL pending.
 
 ## Phase 11 pipeline
 
@@ -128,3 +130,75 @@ See:
 - `docs/phase-12-delta-generation.md`
 - `docs/phase-12-checklist.md`
 - `PHASE12_REPORT.md`
+
+
+## Phase 13 STM32 delta patch
+
+Phase 13 applies the Phase-12 JojoDiff-compatible patch on the STM32
+bootloader without overwriting the active application during reconstruction.
+
+```text
+internal app v1 + W25Q Incoming D13P/.jdiff
+        -> W25Q Reconstructed v2
+        -> verify
+        -> backup/install/trial/confirm
+```
+
+Host/build validation:
+
+```bash
+make phase13-check
+```
+
+Direct STM32 hardware test:
+
+```bash
+export STM32_OPENOCD=/usr/bin/openocd
+export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+
+make phase13-hw-test PORT=/dev/ttyUSB0
+```
+
+For the direct PC-UART hardware test, disconnect the ESP32 UART wires from
+STM32 PA9/PA10.
+
+See:
+
+- `docs/phase-13-stm32-delta.md`
+- `docs/phase-13-checklist.md`
+- `PHASE13_REPORT.md`
+
+
+## Phase 14 secure container
+
+Phase 14 requires signed `SDOT` containers by default:
+
+```text
+SHA-256
+ECDSA P-256
+140-byte signed header (SDOT + SCX1)
+64-byte raw r||s signature
+```
+
+The STM32 bootloader contains only a trusted public key. Private signing keys
+stay outside the repository.
+
+Host/build/security validation:
+
+```bash
+make phase14-check
+```
+
+Physical STM32 validation:
+
+```bash
+export STM32_OPENOCD=/usr/bin/openocd
+export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+make phase14-hw-test PORT=/dev/ttyUSB0
+```
+
+See:
+
+- `docs/phase-14-secure-container.md`
+- `docs/phase-14-checklist.md`
+- `PHASE14_REPORT.md`

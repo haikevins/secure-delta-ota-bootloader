@@ -6,13 +6,20 @@ LOCAL_C_SOURCES := \
   src/main.c \
   src/boot_manager.c \
   src/boot_decision.c \
+  src/delta_patcher.c \
+  src/secure_container.c \
   src/application_jump.c \
   src/image_installer.c \
   src/trial_boot.c \
+  patch/janpatch_port.c \
+  crypto/ecdsa_p256.c \
   storage/metadata_storage.c \
   platform/system_clock.c \
   $(ROOT_DIR)/shared/src/crc32.c \
+  $(ROOT_DIR)/shared/src/sha256.c \
+  $(ROOT_DIR)/shared/src/firmware_container.c \
   $(ROOT_DIR)/shared/src/download_checkpoint.c \
+  $(ROOT_DIR)/shared/src/delta_patch.c \
   $(ROOT_DIR)/shared/src/boot_metadata.c \
   $(ROOT_DIR)/shared/src/backup_image.c \
   $(ROOT_DIR)/shared/src/backup_progress.c \

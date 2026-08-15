@@ -16,6 +16,7 @@ LOCAL_C_SOURCES := \
   platform/system_clock.c \
   $(ROOT_DIR)/shared/src/crc32.c \
   $(ROOT_DIR)/shared/src/download_checkpoint.c \
+  $(ROOT_DIR)/shared/src/delta_patch.c \
   $(ROOT_DIR)/shared/src/boot_metadata.c \
   $(ROOT_DIR)/shared/src/ext_flash_layout.c \
   $(ROOT_DIR)/shared/src/full_image_validation.c \

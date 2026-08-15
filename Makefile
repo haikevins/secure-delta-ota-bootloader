@@ -8,11 +8,13 @@ TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
         phase10-check phase10-candidate phase10-gateway-build phase10-hw-test \
         phase11-check phase11-candidate phase11-gateway-build phase11-hw-test \
         phase12-check phase12-base phase12-target phase12-delta \
+        phase13-check phase13-base phase13-target phase13-delta phase13-baseline phase13-hw-test \
+        phase14-check phase14-v1 phase14-v2 phase14-v3 phase14-hw-test \
         bootloader application firmware combined \
         flash-bootloader flash-application flash-combined dump-metadata erase-metadata \
         gateway tools test release clean toolchain-info
 
-all: phase12-check
+all: phase14-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -216,6 +218,86 @@ phase12-check:
 	@$(TOOLCHAIN_ARG) python3 scripts/phase12_check.py
 
 
+
+phase13-base:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase13-base OUT_DIR=out-phase13-base \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000001UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase13-base OUT_DIR=out-phase13-base \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000001UL" all
+
+phase13-target:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase13-target OUT_DIR=out-phase13-target \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase13-target OUT_DIR=out-phase13-target \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" all
+
+phase13-delta: phase13-base phase13-target
+	@mkdir -p dist/phase13
+	@python3 tools/jojodiff_patch.py generate \
+		node-stm32f103/application/out-phase13-base/application.bin \
+		node-stm32f103/application/out-phase13-target/application.bin \
+		dist/phase13/application-v1-to-v2.jdiff
+	@python3 tools/phase13_delta_artifact.py \
+		--base node-stm32f103/application/out-phase13-base/application.bin \
+		--target node-stm32f103/application/out-phase13-target/application.bin \
+		--patch dist/phase13/application-v1-to-v2.jdiff \
+		--base-version 1 --target-version 2 \
+		--output dist/phase13/application-v1-to-v2.d13
+
+phase13-baseline: bootloader phase13-base
+	@python3 tools/merge_images.py \
+		--bootloader node-stm32f103/bootloader/out/bootloader.bin \
+		--application node-stm32f103/application/out-phase13-base/application.bin \
+		--output dist/secure-delta-ota-phase13.bin \
+		--label "Phase 13"
+
+phase13-check:
+	@$(TOOLCHAIN_ARG) python3 scripts/phase13_check.py
+
+phase13-hw-test: phase13-baseline phase13-delta
+	@PORT="$(PORT)" STM32_PORT="$(STM32_PORT)" \
+		python3 scripts/phase13_hw_test.py
+
+
+
+phase14-v1:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase14-v1 OUT_DIR=out-phase14-v1 \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000001UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase14-v1 OUT_DIR=out-phase14-v1 \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000001UL" all
+
+phase14-v2:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase14-v2 OUT_DIR=out-phase14-v2 \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase14-v2 OUT_DIR=out-phase14-v2 \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" all
+
+phase14-v3:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase14-v3 OUT_DIR=out-phase14-v3 \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000003UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase14-v3 OUT_DIR=out-phase14-v3 \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000003UL" all
+
+phase14-check:
+	@$(TOOLCHAIN_ARG) python3 scripts/phase14_check.py
+
+phase14-hw-test:
+	@PORT="$(PORT)" STM32_PORT="$(STM32_PORT)" \
+		PHASE14_PRIVATE_KEY="$(PHASE14_PRIVATE_KEY)" \
+		PHASE14_KEY_ID="$(PHASE14_KEY_ID)" \
+		$(TOOLCHAIN_ARG) python3 scripts/phase14_hw_test.py
+
+
 firmware: bootloader application
 
 bootloader:
@@ -226,8 +308,8 @@ application:
 
 combined: firmware
 	@python3 tools/merge_images.py \
-		--output dist/secure-delta-ota-phase11.bin \
-		--label "Phase 11"
+		--output dist/secure-delta-ota-phase14-unprovisioned.bin \
+		--label "Phase 14 (unprovisioned trust anchor)"
 
 flash-bootloader:
 	@bash scripts/flash_bootloader.sh
@@ -252,7 +334,7 @@ gateway: phase11-gateway-build
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase12-check
+test: phase14-check
 
 release:
 	@echo "Signed release pipeline is Phase 15."
@@ -278,6 +360,22 @@ clean:
 	@rm -rf node-stm32f103/application/out-phase12-base
 	@rm -rf node-stm32f103/application/build-phase12-target
 	@rm -rf node-stm32f103/application/out-phase12-target
+	@rm -rf node-stm32f103/application/build-phase13-base
+	@rm -rf node-stm32f103/application/out-phase13-base
+	@rm -rf node-stm32f103/application/build-phase13-target
+	@rm -rf node-stm32f103/application/out-phase13-target
+	@rm -rf node-stm32f103/application/build-phase14-v1
+	@rm -rf node-stm32f103/application/out-phase14-v1
+	@rm -rf node-stm32f103/application/build-phase14-v2
+	@rm -rf node-stm32f103/application/out-phase14-v2
+	@rm -rf node-stm32f103/application/build-phase14-v3
+	@rm -rf node-stm32f103/application/out-phase14-v3
+	@rm -rf node-stm32f103/application/build-phase14-hw-v1
+	@rm -rf node-stm32f103/application/out-phase14-hw-v1
+	@rm -rf node-stm32f103/application/build-phase14-hw-v2
+	@rm -rf node-stm32f103/application/out-phase14-hw-v2
+	@rm -rf node-stm32f103/application/build-phase14-hw-v3
+	@rm -rf node-stm32f103/application/out-phase14-hw-v3
 	@rm -rf node-stm32f103/bootloader/build-phase7-fault
 	@rm -rf node-stm32f103/bootloader/out-phase7-fault
 	@rm -rf gateway-esp32/build gateway-esp32/sdkconfig dist build-host

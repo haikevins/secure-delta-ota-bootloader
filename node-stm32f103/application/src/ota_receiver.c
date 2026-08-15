@@ -4,8 +4,10 @@
 #include "crc32.h"
 #include "download_checkpoint.h"
 #include "download_checkpoint_storage.h"
+#include "delta_patch.h"
 #include "external_flash_storage.h"
 #include "firmware_container.h"
+#include "firmware_version.h"
 #include "full_image_validation.h"
 #include "memory_map.h"
 #include "metadata_storage.h"
@@ -24,6 +26,7 @@ typedef struct
     uint8_t reset_pending;
     uint32_t update_id;
     uint32_t target_version;
+    uint32_t base_version;
     uint32_t expected_size;
     uint32_t next_offset;
     uint32_t persisted_offset;
@@ -34,6 +37,7 @@ typedef struct
     uint16_t expected_sequence;
     uint16_t last_data_sequence;
     uint16_t last_data_length;
+    uint8_t artifact_type;
 } OtaReceiverSession_t;
 
 static OtaReceiverSession_t g_session;
@@ -56,6 +60,7 @@ static void ResetTransfer(void)
     g_session.state = (uint8_t)UPDATE_IDLE;
     g_session.update_id = 0UL;
     g_session.target_version = 0UL;
+    g_session.base_version = 0UL;
     g_session.expected_size = 0UL;
     g_session.next_offset = 0UL;
     g_session.persisted_offset = 0UL;
@@ -67,6 +72,7 @@ static void ResetTransfer(void)
     g_session.last_data_offset = 0UL;
     g_session.last_data_sequence = 0U;
     g_session.last_data_length = 0U;
+    g_session.artifact_type = 0U;
 }
 
 
@@ -223,7 +229,11 @@ void OtaReceiver_GetResponseInfo(OtaResponseInfo_t *info)
     info->expected_size = g_session.expected_size;
     info->last_error_detail = g_session.last_error_detail;
     info->capability_flags = (g_session.storage_ready != 0U)
-                                 ? (OTA_CAP_FULL_IMAGE | OTA_CAP_RESUME | OTA_CAP_ROLLBACK)
+                                 ? (OTA_CAP_FULL_IMAGE |
+                                    OTA_CAP_DELTA_IMAGE |
+                                    OTA_CAP_RESUME |
+                                    OTA_CAP_SIGNATURE_VERIFY |
+                                    OTA_CAP_ROLLBACK)
                                  : 0UL;
 }
 
@@ -327,13 +337,125 @@ static bool CalculateIncomingCrc(uint32_t length, uint32_t *crc_out)
     return true;
 }
 
+
+static bool CalculateIncomingCrcRange(uint32_t offset,
+                                      uint32_t length,
+                                      uint32_t *crc_out)
+{
+    uint8_t buffer[256];
+    uint32_t processed = 0UL;
+    uint32_t running = CRC32_IEEE_INITIAL_VALUE;
+
+    if ((crc_out == (uint32_t *)0) ||
+        (offset > g_session.expected_size) ||
+        (length > (g_session.expected_size - offset)))
+    {
+        return false;
+    }
+
+    while (processed < length)
+    {
+        uint32_t chunk = length - processed;
+
+        if (chunk > sizeof(buffer))
+        {
+            chunk = sizeof(buffer);
+        }
+
+        if (!ExternalFlashStorage_Read(
+                EXTERNAL_FLASH_PARTITION_INCOMING,
+                offset + processed,
+                buffer,
+                chunk))
+        {
+            return false;
+        }
+
+        running = Crc32_Update(running, buffer, chunk);
+        processed += chunk;
+    }
+
+    *crc_out = running ^ CRC32_IEEE_FINAL_XOR;
+    return true;
+}
+
+static bool ReadDeltaHeader(DeltaPatchHeader_t *header,
+                            DeltaPatchHeaderStatus_t *validation)
+{
+    uint8_t raw[DELTA_PATCH_HEADER_SIZE];
+    DeltaPatchHeaderStatus_t status;
+
+    if (header == (DeltaPatchHeader_t *)0)
+    {
+        return false;
+    }
+
+    if (!ExternalFlashStorage_Read(
+            EXTERNAL_FLASH_PARTITION_INCOMING,
+            0UL,
+            raw,
+            sizeof(raw)))
+    {
+        return false;
+    }
+
+    status = DeltaPatch_ParseHeader(
+        raw,
+        g_session.expected_size,
+        header);
+
+    if (validation != (DeltaPatchHeaderStatus_t *)0)
+    {
+        *validation = status;
+    }
+
+    return status == DELTA_PATCH_HEADER_VALID;
+}
+
+static uint8_t IncomingLooksLikeSecureContainer(void)
+{
+    uint8_t magic[4];
+
+    if (!ExternalFlashStorage_Read(
+            EXTERNAL_FLASH_PARTITION_INCOMING,
+            0UL,
+            magic,
+            sizeof(magic)))
+    {
+        return 0U;
+    }
+
+    return (uint8_t)(
+        GetU32Le(magic) == FW_CONTAINER_MAGIC);
+}
+
+static uint8_t IncomingLooksLikeDelta(void)
+{
+    uint8_t magic[4];
+
+    if (!ExternalFlashStorage_Read(
+            EXTERNAL_FLASH_PARTITION_INCOMING,
+            0UL,
+            magic,
+            sizeof(magic)))
+    {
+        return 0U;
+    }
+
+    return (uint8_t)(
+        GetU32Le(magic) == DELTA_PATCH_MAGIC);
+}
+
 static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
 {
     uint8_t artifact_type;
     uint16_t container_version;
+    uint32_t base_version;
     uint32_t target_version;
     uint32_t artifact_size;
     uint32_t artifact_crc32;
+    uint32_t container_header_size;
+    uint8_t header_allowed = 0U;
 
     if (request->payload_length != OTA_START_PAYLOAD_SIZE)
     {
@@ -361,30 +483,98 @@ static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
 
     artifact_type = request->payload[0];
     container_version = GetU16Le(&request->payload[2]);
+    base_version = GetU32Le(&request->payload[4]);
     target_version = GetU32Le(&request->payload[8]);
     artifact_size = GetU32Le(&request->payload[12]);
     artifact_crc32 = GetU32Le(&request->payload[16]);
+    container_header_size = GetU32Le(&request->payload[20]);
 
-    if (artifact_type != (uint8_t)FW_IMAGE_FULL)
+    if ((artifact_type != (uint8_t)FW_IMAGE_FULL) &&
+        (artifact_type != (uint8_t)FW_IMAGE_DELTA))
     {
         Nack(request, OTA_STATUS_INVALID_PACKET, artifact_type, response);
         return;
     }
+
     if (container_version != FW_CONTAINER_FORMAT_VERSION)
     {
         Nack(request, OTA_STATUS_CONTAINER_ERROR,
              (uint32_t)container_version, response);
         return;
     }
-    if ((artifact_size == 0UL) || (artifact_size > EXT_INCOMING_SIZE))
+
+    if ((artifact_size <=
+         (FW_CONTAINER_HEADER_SIZE +
+          FW_ECDSA_P256_RAW_SIGNATURE_SIZE)) ||
+        (artifact_size > EXT_INCOMING_SIZE))
     {
+#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+        if (artifact_size == 0UL)
+        {
+            Nack(request, OTA_STATUS_IMAGE_TOO_LARGE, artifact_size, response);
+            return;
+        }
+#else
         Nack(request, OTA_STATUS_IMAGE_TOO_LARGE, artifact_size, response);
+        return;
+#endif
+    }
+
+    if ((target_version == 0UL) ||
+        (target_version <= (uint32_t)APPLICATION_VERSION))
+    {
+        Nack(request, OTA_STATUS_VERSION_REJECTED,
+             (uint32_t)APPLICATION_VERSION, response);
+        return;
+    }
+
+    if (container_header_size == FW_CONTAINER_HEADER_SIZE)
+    {
+        header_allowed = 1U;
+    }
+
+#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+    if ((artifact_type == (uint8_t)FW_IMAGE_DELTA) &&
+        (container_header_size == DELTA_PATCH_HEADER_SIZE))
+    {
+        header_allowed = 1U;
+    }
+    if ((artifact_type == (uint8_t)FW_IMAGE_FULL) &&
+        (container_header_size == 0UL))
+    {
+        header_allowed = 1U;
+    }
+#endif
+
+    if (header_allowed == 0U)
+    {
+        Nack(request, OTA_STATUS_SIGNATURE_ERROR,
+             container_header_size, response);
+        return;
+    }
+
+    if (artifact_type == (uint8_t)FW_IMAGE_DELTA)
+    {
+        if ((base_version == 0UL) ||
+            (base_version != (uint32_t)APPLICATION_VERSION))
+        {
+            Nack(request, OTA_STATUS_BASE_MISMATCH,
+                 (uint32_t)APPLICATION_VERSION, response);
+            return;
+        }
+    }
+    else if (base_version != 0UL)
+    {
+        Nack(request, OTA_STATUS_CONTAINER_ERROR,
+             base_version, response);
         return;
     }
 
     g_session.state = (uint8_t)UPDATE_RECEIVING;
     g_session.update_id = request->update_id;
     g_session.target_version = target_version;
+    g_session.base_version = base_version;
+    g_session.artifact_type = artifact_type;
     g_session.expected_size = artifact_size;
     g_session.next_offset = 0UL;
     g_session.artifact_crc32 = artifact_crc32;
@@ -605,7 +795,7 @@ static bool ValidateIncomingApplication(uint32_t *detail)
     return status == FULL_IMAGE_VALID;
 }
 
-static bool PersistInstallRequest(uint32_t *detail)
+static bool PersistFullInstallRequest(uint32_t *detail)
 {
     UpdateHandoffRecord_t record;
     UpdateHandoffRecord_t committed_record;
@@ -620,16 +810,22 @@ static bool PersistInstallRequest(uint32_t *detail)
                        g_session.expected_size,
                        g_session.artifact_crc32);
 
-    handoff_status = UpdateHandoffStorage_Commit(&record,
-                                                 &committed_record,
-                                                 (UpdateHandoffSlot_t *)0);
+    handoff_status = UpdateHandoffStorage_Commit(
+        &record,
+        &committed_record,
+        (UpdateHandoffSlot_t *)0);
     if (handoff_status != UPDATE_HANDOFF_STORAGE_OK)
     {
-        if (detail != (uint32_t *)0) { *detail = (uint32_t)handoff_status; }
+        if (detail != (uint32_t *)0)
+        {
+            *detail = (uint32_t)handoff_status;
+        }
         return false;
     }
 
-    metadata_status = MetadataStorage_Load(&metadata, (BootMetadataSlot_t *)0);
+    metadata_status = MetadataStorage_Load(
+        &metadata,
+        (BootMetadataSlot_t *)0);
     if ((metadata_status != METADATA_STORAGE_OK) &&
         (metadata_status != METADATA_STORAGE_DEFAULTS_USED))
     {
@@ -649,14 +845,180 @@ static bool PersistInstallRequest(uint32_t *detail)
     metadata.boot_attempts = 0UL;
     metadata.last_error = 0UL;
 
-    metadata_status = MetadataStorage_Commit(&metadata,
-                                             &committed_metadata,
-                                             (BootMetadataSlot_t *)0);
+    metadata_status = MetadataStorage_Commit(
+        &metadata,
+        &committed_metadata,
+        (BootMetadataSlot_t *)0);
     if (metadata_status != METADATA_STORAGE_OK)
     {
         if (detail != (uint32_t *)0)
         {
             *detail = 0x200UL | (uint32_t)metadata_status;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+static bool ValidateDeltaInstallRequest(
+    DeltaPatchHeader_t *header,
+    uint32_t *detail)
+{
+    DeltaPatchHeaderStatus_t header_status =
+        DELTA_PATCH_HEADER_INVALID_ARGUMENT;
+    uint32_t patch_crc = 0UL;
+    uint32_t base_crc;
+
+    if (!ReadDeltaHeader(header, &header_status))
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D1000UL | (uint32_t)header_status;
+        }
+        return false;
+    }
+
+    if ((header->base_version != (uint32_t)APPLICATION_VERSION) ||
+        (header->target_version != g_session.target_version))
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D2000UL |
+                      (header->base_version & 0xFFFUL);
+        }
+        return false;
+    }
+
+    if (!CalculateIncomingCrcRange(
+            DELTA_PATCH_HEADER_SIZE,
+            header->patch_size,
+            &patch_crc))
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D3001UL;
+        }
+        return false;
+    }
+
+    if (patch_crc != header->patch_crc32)
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D3002UL;
+        }
+        return false;
+    }
+
+    base_crc = Crc32_Calculate(
+        (const void *)APPLICATION_START_ADDRESS,
+        header->base_image_size);
+
+    if (base_crc != header->base_image_crc32)
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D4001UL;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+static bool PersistDeltaInstallRequest(
+    const DeltaPatchHeader_t *header,
+    uint32_t *detail)
+{
+    BootMetadata_t metadata;
+    BootMetadata_t committed_metadata;
+    MetadataStorageStatus_t status;
+
+    status = MetadataStorage_Load(
+        &metadata,
+        (BootMetadataSlot_t *)0);
+    if ((status != METADATA_STORAGE_OK) &&
+        (status != METADATA_STORAGE_DEFAULTS_USED))
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D5000UL | (uint32_t)status;
+        }
+        return false;
+    }
+
+    if (metadata.active_version != header->base_version)
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D5008UL;
+        }
+        return false;
+    }
+
+    metadata.state = (uint32_t)UPDATE_ARTIFACT_READY;
+    metadata.pending_version = header->target_version;
+    metadata.active_update_id = g_session.update_id;
+    metadata.received_size = g_session.expected_size;
+    metadata.expected_size = g_session.expected_size;
+    metadata.copy_offset = 0UL;
+    metadata.boot_attempts = 0UL;
+    metadata.last_error = 0UL;
+
+    status = MetadataStorage_Commit(
+        &metadata,
+        &committed_metadata,
+        (BootMetadataSlot_t *)0);
+    if (status != METADATA_STORAGE_OK)
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x000D5100UL | (uint32_t)status;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+static bool PersistSecureInstallRequest(uint32_t *detail)
+{
+    BootMetadata_t metadata;
+    BootMetadata_t committed_metadata;
+    MetadataStorageStatus_t status;
+
+    status = MetadataStorage_Load(
+        &metadata,
+        (BootMetadataSlot_t *)0);
+    if ((status != METADATA_STORAGE_OK) &&
+        (status != METADATA_STORAGE_DEFAULTS_USED))
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x00140100UL | (uint32_t)status;
+        }
+        return false;
+    }
+
+    metadata.state = (uint32_t)UPDATE_ARTIFACT_READY;
+    metadata.pending_version = g_session.target_version;
+    metadata.active_update_id = g_session.update_id;
+    metadata.received_size = g_session.expected_size;
+    metadata.expected_size = g_session.expected_size;
+    metadata.copy_offset = 0UL;
+    metadata.boot_attempts = 0UL;
+    metadata.last_error = 0UL;
+
+    status = MetadataStorage_Commit(
+        &metadata,
+        &committed_metadata,
+        (BootMetadataSlot_t *)0);
+    if (status != METADATA_STORAGE_OK)
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x00140200UL | (uint32_t)status;
         }
         return false;
     }
@@ -688,22 +1050,66 @@ static void ProcessInstall(const OtaPacket_t *request, OtaPacket_t *response)
         Nack(request, OTA_STATUS_VERSION_REJECTED, 0UL, response);
         return;
     }
-    if (g_session.expected_size > APPLICATION_MAX_SIZE)
+
+    if (IncomingLooksLikeSecureContainer() != 0U)
     {
-        Nack(request, OTA_STATUS_IMAGE_TOO_LARGE,
-             g_session.expected_size, response);
+        /*
+         * The application intentionally does not authenticate the container.
+         * It only persists the transfer handoff. The bootloader is the trust
+         * boundary and verifies SHA-256 + ECDSA before touching the active app.
+         */
+        if (!PersistSecureInstallRequest(&detail))
+        {
+            Nack(request, OTA_STATUS_INTERNAL_ERROR, detail, response);
+            return;
+        }
+    }
+#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+    else if (IncomingLooksLikeDelta() != 0U)
+    {
+        DeltaPatchHeader_t header;
+
+        if (!ValidateDeltaInstallRequest(&header, &detail))
+        {
+            Nack(request, OTA_STATUS_BASE_MISMATCH, detail, response);
+            return;
+        }
+
+        if (!PersistDeltaInstallRequest(&header, &detail))
+        {
+            Nack(request, OTA_STATUS_INTERNAL_ERROR, detail, response);
+            return;
+        }
+    }
+    else
+    {
+        if (g_session.expected_size > APPLICATION_MAX_SIZE)
+        {
+            Nack(request, OTA_STATUS_IMAGE_TOO_LARGE,
+                 g_session.expected_size, response);
+            return;
+        }
+
+        if (!ValidateIncomingApplication(&detail))
+        {
+            Nack(request, OTA_STATUS_CONTAINER_ERROR, detail, response);
+            return;
+        }
+
+        if (!PersistFullInstallRequest(&detail))
+        {
+            Nack(request, OTA_STATUS_INTERNAL_ERROR, detail, response);
+            return;
+        }
+    }
+#else
+    else
+    {
+        Nack(request, OTA_STATUS_SIGNATURE_ERROR,
+             0x0014FFFFUL, response);
         return;
     }
-    if (!ValidateIncomingApplication(&detail))
-    {
-        Nack(request, OTA_STATUS_CONTAINER_ERROR, detail, response);
-        return;
-    }
-    if (!PersistInstallRequest(&detail))
-    {
-        Nack(request, OTA_STATUS_INTERNAL_ERROR, detail, response);
-        return;
-    }
+#endif
 
     Ack(request, response);
     g_session.reset_pending = 1U;

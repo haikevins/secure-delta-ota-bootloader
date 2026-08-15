@@ -4,8 +4,10 @@
 
 #include "application_jump.h"
 #include "boot_decision.h"
+#include "delta_patcher.h"
 #include "boot_metadata.h"
 #include "image_installer.h"
+#include "secure_container.h"
 #include "metadata_storage.h"
 #include "memory_map.h"
 #include "trial_boot.h"
@@ -27,6 +29,8 @@
 #define INSTALL_ERROR_PULSES        10UL
 #define TRIAL_ERROR_PULSES          11UL
 #define ROLLBACK_ERROR_PULSES       12UL
+#define DELTA_ERROR_PULSES          13UL
+#define SECURE_ERROR_PULSES         14UL
 #define MAX_BOOT_TRANSITIONS        8UL
 
 static volatile uint32_t g_boot_tick_ms;
@@ -160,6 +164,8 @@ void BootManager_Run(void)
     MetadataStorageStatus_t storage_status;
     BootDecision_t decision;
     ImageInstallerStatus_t installer_status;
+    DeltaPatcherStatus_t delta_status;
+    SecureContainerStatus_t secure_status;
     TrialBootStatus_t trial_status;
     uint8_t application_valid;
     uint32_t transitions;
@@ -205,6 +211,86 @@ void BootManager_Run(void)
          ++transitions)
     {
         decision = BootDecision_Evaluate(&metadata, application_valid);
+
+        if ((decision.action == BOOT_ACTION_PROCESS_ARTIFACT) ||
+            (decision.action == BOOT_ACTION_RESTART_VALIDATION) ||
+            (decision.action == BOOT_ACTION_RESTART_PATCH))
+        {
+            if (SecureContainer_IsIncoming() != 0U)
+            {
+                secure_status =
+                    SecureContainer_Process(
+                        &metadata,
+                        &committed_metadata);
+
+                if ((secure_status != SECURE_CONTAINER_OK) &&
+                    (secure_status != SECURE_CONTAINER_SOURCE_REJECTED))
+                {
+                    BootManager_ShowFatalPulses(
+                        SECURE_ERROR_PULSES);
+                }
+
+                metadata = committed_metadata;
+                BootManager_RefreshApplication(
+                    &application_vector,
+                    &application_status,
+                    &application_valid);
+                continue;
+            }
+
+#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+            if (DeltaPatcher_IsDeltaArtifact() != 0U)
+            {
+                delta_status =
+                    DeltaPatcher_Process(
+                        &metadata,
+                        &committed_metadata);
+
+                if ((delta_status != DELTA_PATCHER_OK) &&
+                    (delta_status != DELTA_PATCHER_SOURCE_REJECTED))
+                {
+                    BootManager_ShowFatalPulses(
+                        DELTA_ERROR_PULSES);
+                }
+
+                metadata = committed_metadata;
+                BootManager_RefreshApplication(
+                    &application_vector,
+                    &application_status,
+                    &application_valid);
+                continue;
+            }
+
+            if (decision.action != BOOT_ACTION_PROCESS_ARTIFACT)
+            {
+                BootManager_ShowFatalPulses(
+                    DELTA_ERROR_PULSES);
+            }
+#else
+            /*
+             * Secure Phase-14 builds reject every unsigned legacy artifact.
+             * SecureContainer_Process performs a safe IDLE rejection and
+             * preserves the active application.
+             */
+            secure_status =
+                SecureContainer_Process(
+                    &metadata,
+                    &committed_metadata);
+
+            if (secure_status != SECURE_CONTAINER_SOURCE_REJECTED)
+            {
+                BootManager_ShowFatalPulses(
+                    SECURE_ERROR_PULSES);
+            }
+
+            metadata = committed_metadata;
+            BootManager_RefreshApplication(
+                &application_vector,
+                &application_status,
+                &application_valid);
+            continue;
+#endif
+        }
 
         if (BootManager_ActionNeedsInstallWork(decision.action) != 0U)
         {

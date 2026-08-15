@@ -193,3 +193,48 @@ payload_crc32
 Phase 12 does not yet serialize the final signed container header and does not
 claim authenticity. Container signing remains a later phase. STM32 patch
 application starts in Phase 13.
+
+
+## Phase 13 functional-envelope note
+
+Phase 13 introduces a temporary 48-byte `D13P` engineering envelope around
+the JojoDiff-compatible payload so the STM32 bootloader can persist exact
+base/target sizes, versions and CRC32 values across reset.
+
+`D13P` is not the final secure container and is not signed. It exists only to
+exercise the complete embedded delta path before the signed-container phase.
+The frozen `FirmwareContainerHeader_t` remains the target authenticated
+container format.
+
+
+## Phase 14 implementation note
+
+Phase 14 now implements the previously reserved signed-container interface.
+
+The Phase-0 fixed header remains 120 bytes. A signed `SCX1` extension v1 adds
+20 bytes, so the implemented canonical `header_size` is 140 bytes.
+
+`SCX1` carries:
+
+```text
+key_id
+base_image_size
+target_image_crc32
+```
+
+The implemented signature profile is:
+
+```text
+hash_algorithm      = FW_HASH_SHA256
+signature_algorithm = FW_SIGNATURE_ECDSA_P256
+signature_size      = 64
+signature encoding  = big-endian r[32] || s[32]
+```
+
+The signature covers the complete 140-byte header plus payload. Unsigned raw
+full and Phase-13 D13P artifacts are disabled by default in Phase 14.
+
+The private signing key remains host-side. The STM32 bootloader contains only a
+public P-256 trust anchor and key ID.
+
+Key custody, release authorization and server publication remain Phase 15.

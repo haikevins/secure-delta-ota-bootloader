@@ -1,0 +1,68 @@
+Phase 14 validation
+
+Host/build/security:
+  make phase14-check
+
+Expected final markers:
+  Phase 14 SHA-256 + ECDSA-P256 host crypto vectors: PASS
+  Phase 14 canonical container parser: PASS
+  Phase 14 exact bootloader secure-envelope verification: PASS
+  Phase 14 secure-container JanpatchPort reconstruction: PASS
+  Phase 14 exact embedded secure delta reconstruction: PASS
+  Phase 14 private-key non-persistence: PASS
+  Secure Delta OTA Phase 14 secure container check: PASS
+
+Physical HIL:
+  export STM32_OPENOCD=/usr/bin/openocd
+  export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+  make phase14-hw-test PORT=/dev/ttyUSB0
+
+Expected hardware markers:
+  P14_KEY=PASS
+  P14_BASELINE=PASS app=v1
+  P14_SECURE_DELTA=PASS target=v2
+  P14_UNSIGNED_REJECT=PASS
+  P14_SIGNATURE_REJECT=PASS
+  P14_SECURE_FULL=PASS target=v3
+  P14_DOWNGRADE_REJECT=PASS
+  Phase 14 secure container hardware test: PASS
+
+Security:
+  Private signing keys are not packaged.
+  The repository trust-anchor header is unprovisioned by default.
+  Unsigned legacy OTA is disabled by default.
+
+Phase boundary:
+  Server/release/key-custody work begins in Phase 15.
+
+Actual packaged-workspace host/build/security result:
+
+  Phase 12 JojoDiff-compatible generator regression: PASS
+  Phase 14 key provisioning (public key only): PASS
+  Phase 14 provisioned bootloader size: PASS
+  Phase 14 full/delta container generation + OpenSSL verification: PASS
+  Phase 14 SHA-256 + ECDSA-P256 exact MCU crypto vectors: PASS
+  Phase 14 canonical container parser: PASS
+  Phase 14 exact bootloader secure-envelope verification: PASS
+  Phase 14 exact embedded secure delta reconstruction: PASS
+  Phase 14 private-key non-persistence: PASS
+  Secure Delta OTA Phase 14 secure container check: PASS
+
+Measured Clang reference:
+  Provisioned bootloader: 19064 / 24576 bytes
+  Application v1/v2/v3: 11264 / 11276 / 11276 bytes
+  JojoDiff delta payload: 970 bytes
+  Signed delta SDOT: 1174 bytes
+  Signed delta savings vs full target image: 89.59%
+  Signed full v3 SDOT: 11480 bytes
+  SDOT header: 140 bytes
+  Raw ECDSA-P256 signature: 64 bytes
+
+Packaging:
+  Repository trust anchor restored to unprovisioned placeholder.
+  Temporary signing private key not packaged.
+  Temporary signed SDOT artifacts generated with ephemeral test key are not packaged.
+  Physical Phase-14 HIL: PENDING USER BOARD TEST.
+  Empty PHASE14_KEY_ID Makefile environment regression: PASS
+  Invalid PHASE14_KEY_ID diagnostic regression: PASS
+  Physical HIL re-test after key-id fix: PENDING

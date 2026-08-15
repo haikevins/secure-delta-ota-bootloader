@@ -144,3 +144,22 @@ Otherwise, use the full container.
 - UART packet fields and state rules are frozen at protocol version 1.
 - Boot/update transitions and power-loss behavior are documented.
 - Security trust boundary and out-of-scope items are documented.
+
+
+## Phase 14 trust-boundary update
+
+The bootloader now enforces firmware authenticity using signed SDOT containers.
+ESP32, HTTPS, MQTT and UART remain transport/orchestration layers and do not
+become firmware trust anchors.
+
+For both full and delta updates:
+
+```text
+transport integrity != firmware authenticity
+```
+
+CRC32 remains useful for transfer/storage corruption detection. SHA-256 binds
+the exact base/target image bytes, and ECDSA P-256 authenticates the signed
+container.
+
+Unsigned legacy installation is disabled by default.

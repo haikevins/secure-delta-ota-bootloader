@@ -1,0 +1,22 @@
+{
+  "artifact_crc32": "0xDC787F80",
+  "artifact_sha256": "2ca2ff0973b642a522c8bc904cdad79a595b979f7b03eb48da949fdf89849285",
+  "artifact_size": 1093,
+  "artifact_type": "stm32-delta-functional-envelope",
+  "base_crc32": "0xDB8E4DE9",
+  "base_sha256": "1008845e1c94f367ce4dc47dd0fb7bee408486084c5c438dbcef51e4bc9526d7",
+  "base_size": 12620,
+  "base_version": 1,
+  "format": "D13P",
+  "header_size": 48,
+  "patch_crc32": "0xF6AAC5CB",
+  "patch_sha256": "a562f953b012f6be620faf7ed9838cce78c78fe8e6f39dde02f14de796e36071",
+  "patch_size": 1045,
+  "schema": 1,
+  "security_note": "CRC32 provides Phase-13 integrity/base binding only; signed authenticity remains Phase 14.",
+  "target_crc32": "0xCF8CD84F",
+  "target_load_address": "0x08006000",
+  "target_sha256": "deb67fe6d5e2cd7e4b5d385b60ae1c8b73212c6b274d6548364646b888a622bb",
+  "target_size": 12632,
+  "target_version": 2
+}

@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+  12624	      8	   1960	  14592	   3900	out-phase13-target/application.elf

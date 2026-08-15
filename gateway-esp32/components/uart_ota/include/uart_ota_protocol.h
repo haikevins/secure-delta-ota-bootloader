@@ -18,7 +18,9 @@
 #define UART_OTA_START_PAYLOAD_SIZE     24U
 
 #define UART_OTA_CAP_FULL_IMAGE         (1UL << 0)
+#define UART_OTA_CAP_DELTA_IMAGE        (1UL << 1)
 #define UART_OTA_CAP_RESUME             (1UL << 2)
+#define UART_OTA_CAP_SIGNATURE_VERIFY   (1UL << 3)
 #define UART_OTA_CAP_ROLLBACK           (1UL << 4)
 
 typedef enum

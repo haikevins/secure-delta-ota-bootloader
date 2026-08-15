@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
+import struct
 import time
 
 from ota_uart_protocol import (
@@ -15,6 +16,12 @@ from ota_uart_protocol import (
     UPDATE_ARTIFACT_READY, UPDATE_IDLE, UPDATE_RECEIVING,
     build_start_payload, cobs_encode, crc32, decode_frame,
     encode_frame, parse_ack, parse_hello, serialize_packet,
+    CAP_DELTA_IMAGE,
+    FW_IMAGE_DELTA,
+    FW_IMAGE_FULL,
+    CAP_SIGNATURE_VERIFY,
+    STATUS_SIGNATURE_ERROR,
+    STATUS_VERSION_REJECTED,
 )
 
 DEFAULT_BAUD = 115200
@@ -139,7 +146,10 @@ def control(link: SerialLink, command: int, update_id: int = 0):
     return info
 
 def transfer(link: SerialLink, data: bytes, update_id: int,
-             target_version: int = 0) -> None:
+             target_version: int = 0,
+             artifact_type: int = FW_IMAGE_FULL,
+             base_version: int = 0,
+             container_header_size: int = 0) -> None:
     if not data:
         raise ProtocolError("artifact must not be empty")
     if len(data) > MAX_ARTIFACT:
@@ -194,7 +204,10 @@ def transfer(link: SerialLink, data: bytes, update_id: int,
                 payload=build_start_payload(
                     len(data),
                     artifact_crc,
-                    target_version=target_version
+                    artifact_type=artifact_type,
+                    base_version=base_version,
+                    target_version=target_version,
+                    container_header_size=container_header_size,
                 )
             )),
             "START"
@@ -319,6 +332,257 @@ def full_ota(link: SerialLink, data: bytes,
         f"target_version=0x{target_version:08X} size={len(data)}"
     )
 
+
+PHASE13_DELTA_MAGIC = 0x50333144
+PHASE13_DELTA_HEADER_SIZE = 48
+PHASE13_DELTA_PREFIX = struct.Struct("<IHHIIIIIIIII")
+PHASE13_DELTA_CRC = struct.Struct("<I")
+
+
+def parse_phase13_delta_artifact(data: bytes) -> dict[str, int]:
+    if len(data) < PHASE13_DELTA_HEADER_SIZE:
+        raise ProtocolError("Phase-13 delta artifact is too short")
+
+    values = PHASE13_DELTA_PREFIX.unpack_from(data)
+    stored_header_crc = PHASE13_DELTA_CRC.unpack_from(
+        data, PHASE13_DELTA_HEADER_SIZE - 4
+    )[0]
+
+    if values[0] != PHASE13_DELTA_MAGIC:
+        raise ProtocolError("not a D13P delta artifact")
+    if values[1] != 1 or values[2] != PHASE13_DELTA_HEADER_SIZE:
+        raise ProtocolError("unsupported D13P format/header size")
+    if crc32(data[:PHASE13_DELTA_HEADER_SIZE - 4]) != stored_header_crc:
+        raise ProtocolError("D13P header CRC mismatch")
+
+    info = {
+        "base_version": values[3],
+        "target_version": values[4],
+        "base_size": values[5],
+        "patch_size": values[6],
+        "target_size": values[7],
+        "target_address": values[8],
+        "base_crc32": values[9],
+        "target_crc32": values[10],
+        "patch_crc32": values[11],
+    }
+
+    if PHASE13_DELTA_HEADER_SIZE + info["patch_size"] != len(data):
+        raise ProtocolError("D13P patch size/total size mismatch")
+    if crc32(data[PHASE13_DELTA_HEADER_SIZE:]) != info["patch_crc32"]:
+        raise ProtocolError("D13P patch CRC mismatch")
+    if info["target_address"] != APPLICATION_ADDRESS:
+        raise ProtocolError("D13P target address mismatch")
+
+    return info
+
+
+def delta_ota(link: SerialLink,
+              data: bytes,
+              update_id: int) -> None:
+    info = parse_phase13_delta_artifact(data)
+
+    hello = parse_hello(
+        link.request(Packet(command=CMD_QUERY))
+    )
+
+    if (hello.capability_flags & CAP_DELTA_IMAGE) == 0:
+        raise ProtocolError("STM32 does not advertise delta capability")
+
+    if hello.application_version != info["base_version"]:
+        raise ProtocolError(
+            f"delta base mismatch: node=v{hello.application_version} "
+            f"artifact=v{info['base_version']}"
+        )
+
+    transfer(
+        link,
+        data,
+        update_id,
+        target_version=info["target_version"],
+        artifact_type=FW_IMAGE_DELTA,
+        base_version=info["base_version"],
+        container_header_size=PHASE13_DELTA_HEADER_SIZE,
+    )
+
+    install_packet = Packet(
+        command=CMD_INSTALL,
+        update_id=update_id,
+        offset=len(data),
+        sequence=0,
+    )
+
+    try:
+        require_ack(
+            link.request(install_packet),
+            "DELTA INSTALL",
+        )
+        print(
+            "DELTA INSTALL ACK: PASS; "
+            "waiting for patch/install/trial"
+        )
+    except TimeoutError:
+        print(
+            "DELTA INSTALL ACK not observed; "
+            "waiting for final application"
+        )
+
+    final = wait_for_application_version(
+        link,
+        info["target_version"],
+        wait_seconds=45.0,
+        required_state=UPDATE_IDLE,
+    )
+
+    print(
+        f"Phase 13 Delta OTA PASS update_id=0x{update_id:08X} "
+        f"base=v{info['base_version']} "
+        f"target=v{final.application_version} "
+        f"artifact={len(data)} patch={info['patch_size']}"
+    )
+
+
+
+PHASE14_CONTAINER_MAGIC = 0x544F4453
+PHASE14_CONTAINER_HEADER_SIZE = 140
+PHASE14_FIXED = struct.Struct("<IHHIIIIIIIII32s32sIHHHH")
+PHASE14_EXT = struct.Struct("<IHHIII")
+PHASE14_SIGNATURE_SIZE = 64
+
+
+def parse_phase14_secure_container(data: bytes) -> dict[str, int]:
+    if len(data) < PHASE14_CONTAINER_HEADER_SIZE + PHASE14_SIGNATURE_SIZE:
+        raise ProtocolError("Phase-14 secure container is too short")
+
+    fixed = PHASE14_FIXED.unpack_from(data, 0)
+    extension = PHASE14_EXT.unpack_from(data, PHASE14_FIXED.size)
+
+    if fixed[0] != PHASE14_CONTAINER_MAGIC:
+        raise ProtocolError("not an SDOT secure container")
+    if fixed[1] != 1 or fixed[2] != PHASE14_CONTAINER_HEADER_SIZE:
+        raise ProtocolError("unsupported SDOT format/header size")
+    if extension[0] != 0x31584353 or extension[1] != 1 or extension[2] != 20:
+        raise ProtocolError("invalid SDOT SCX1 extension")
+    if fixed[15] != 1 or fixed[16] != 1 or fixed[17] != PHASE14_SIGNATURE_SIZE:
+        raise ProtocolError("unsupported SDOT hash/signature algorithm")
+
+    image_type = fixed[5]
+    base_version = fixed[7]
+    target_version = fixed[8]
+    payload_size = fixed[9]
+    target_size = fixed[10]
+    target_address = fixed[11]
+    payload_crc32 = fixed[14]
+    key_id = extension[3]
+    base_size = extension[4]
+    target_crc32 = extension[5]
+
+    total = PHASE14_CONTAINER_HEADER_SIZE + payload_size + PHASE14_SIGNATURE_SIZE
+    if total != len(data):
+        raise ProtocolError("SDOT total length mismatch")
+    if target_address != APPLICATION_ADDRESS:
+        raise ProtocolError("SDOT target address mismatch")
+    if crc32(
+        data[PHASE14_CONTAINER_HEADER_SIZE:
+             PHASE14_CONTAINER_HEADER_SIZE + payload_size]
+    ) != payload_crc32:
+        raise ProtocolError("SDOT payload CRC mismatch")
+    if image_type not in (FW_IMAGE_FULL, FW_IMAGE_DELTA):
+        raise ProtocolError("SDOT image type invalid")
+    if image_type == FW_IMAGE_FULL and base_version != 0:
+        raise ProtocolError("SDOT full image has non-zero base version")
+    if image_type == FW_IMAGE_DELTA and base_version == 0:
+        raise ProtocolError("SDOT delta has zero base version")
+
+    return {
+        "image_type": image_type,
+        "base_version": base_version,
+        "target_version": target_version,
+        "payload_size": payload_size,
+        "target_size": target_size,
+        "base_size": base_size,
+        "target_crc32": target_crc32,
+        "key_id": key_id,
+    }
+
+
+def secure_ota(link: SerialLink,
+               data: bytes,
+               update_id: int) -> None:
+    info = parse_phase14_secure_container(data)
+
+    hello = parse_hello(
+        link.request(Packet(command=CMD_QUERY))
+    )
+
+    if (hello.capability_flags & CAP_SIGNATURE_VERIFY) == 0:
+        raise ProtocolError(
+            "STM32 does not advertise signature verification capability"
+        )
+
+    if info["target_version"] <= hello.application_version:
+        raise ProtocolError(
+            f"secure target version v{info['target_version']} is not newer "
+            f"than node v{hello.application_version}"
+        )
+
+    if info["image_type"] == FW_IMAGE_DELTA:
+        if (hello.capability_flags & CAP_DELTA_IMAGE) == 0:
+            raise ProtocolError("STM32 does not advertise delta capability")
+        if hello.application_version != info["base_version"]:
+            raise ProtocolError(
+                f"secure delta base mismatch: node=v{hello.application_version} "
+                f"container=v{info['base_version']}"
+            )
+
+    transfer(
+        link,
+        data,
+        update_id,
+        target_version=info["target_version"],
+        artifact_type=info["image_type"],
+        base_version=info["base_version"],
+        container_header_size=PHASE14_CONTAINER_HEADER_SIZE,
+    )
+
+    install_packet = Packet(
+        command=CMD_INSTALL,
+        update_id=update_id,
+        offset=len(data),
+        sequence=0,
+    )
+
+    try:
+        require_ack(
+            link.request(install_packet),
+            "SECURE INSTALL",
+        )
+        print(
+            "SECURE INSTALL ACK: PASS; "
+            "waiting for signature/patch/install/trial"
+        )
+    except TimeoutError:
+        print(
+            "SECURE INSTALL ACK not observed; "
+            "waiting for final application"
+        )
+
+    final = wait_for_application_version(
+        link,
+        info["target_version"],
+        wait_seconds=60.0,
+        required_state=UPDATE_IDLE,
+    )
+
+    print(
+        f"Phase 14 Secure OTA PASS update_id=0x{update_id:08X} "
+        f"type={'delta' if info['image_type'] == FW_IMAGE_DELTA else 'full'} "
+        f"target=v{final.application_version} "
+        f"container={len(data)} payload={info['payload_size']} "
+        f"key_id=0x{info['key_id']:08X}"
+    )
+
+
 def self_test(link: SerialLink, size: int, update_id: int) -> None:
     if not 1 <= size <= 4096:
         raise ProtocolError("self-test size must be 1..4096")
@@ -425,6 +689,12 @@ def main() -> int:
     ota.add_argument("file", type=Path)
     ota.add_argument("--update-id", type=parse_u32)
     ota.add_argument("--target-version", type=parse_u32, required=True)
+    delta = sub.add_parser("delta-ota")
+    delta.add_argument("file", type=Path)
+    delta.add_argument("--update-id", type=parse_u32)
+    secure = sub.add_parser("secure-ota")
+    secure.add_argument("file", type=Path)
+    secure.add_argument("--update-id", type=parse_u32)
     test = sub.add_parser("self-test")
     test.add_argument("--size", type=int, default=1024)
     test.add_argument("--update-id", type=parse_u32, default=0x50050001)
@@ -458,6 +728,22 @@ def main() -> int:
                 if update_id == 0:
                     update_id = 1
             full_ota(link, data, update_id, args.target_version)
+        elif args.action == "delta-ota":
+            data = args.file.read_bytes()
+            update_id = args.update_id
+            if update_id is None:
+                update_id = int(time.time_ns()) & 0xFFFFFFFF
+                if update_id == 0:
+                    update_id = 1
+            delta_ota(link, data, update_id)
+        elif args.action == "secure-ota":
+            data = args.file.read_bytes()
+            update_id = args.update_id
+            if update_id is None:
+                update_id = int(time.time_ns()) & 0xFFFFFFFF
+                if update_id == 0:
+                    update_id = 1
+            secure_ota(link, data, update_id)
         elif args.action == "self-test":
             self_test(link, args.size, args.update_id)
     except (ProtocolError, TimeoutError, OSError) as exc:

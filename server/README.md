@@ -18,3 +18,5 @@ make phase12-delta
 MQTT orchestration is implemented in the ESP32 Phase-11 gateway. Signed release
 publication and private-key handling remain a later phase; private signing keys
 must never be committed to this repository.
+
+Phase 14 provides signed SDOT artifact tooling. Production signing-key custody and release publication are intentionally deferred to Phase 15.

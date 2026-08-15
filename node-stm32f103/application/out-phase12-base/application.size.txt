@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  10172	      8	   1952	  12132	   2f64	out-phase12-base/application.elf
+  11868	      8	   1952	  13828	   3604	out-phase12-base/application.elf

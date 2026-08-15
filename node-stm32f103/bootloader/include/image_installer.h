@@ -41,9 +41,10 @@ typedef enum
 } ImageInstallerStatus_t;
 
 /*
- * Historical name retained for Phase-6/7 callers. In Phase 8 the function
- * performs: validate candidate -> backup active image -> page-checkpointed
- * install -> verify -> enter TRIAL_BOOT. It no longer promotes active_version.
+ * Historical name retained for Phase-6/7 callers. The function now installs
+ * either a full candidate from Incoming Artifact or a Phase-13 reconstructed
+ * delta candidate from Reconstructed Image, then reuses the Phase-8
+ * backup/page-checkpoint/trial/rollback lifecycle.
  */
 ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(
     const BootMetadata_t *metadata,

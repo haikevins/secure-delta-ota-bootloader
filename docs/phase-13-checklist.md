@@ -1,0 +1,52 @@
+# Phase 13 Checklist
+
+- [x] STM32 SPL + CMSIS only; no HAL.
+- [x] Phase-12 JojoDiff-compatible patch consumed on STM32.
+- [x] Functional D13P persistent delta envelope.
+- [x] Header CRC32 validation.
+- [x] Patch CRC32 validation.
+- [x] Exact base-version binding.
+- [x] Exact base-image CRC32 binding.
+- [x] Target image CRC32.
+- [x] Target vector validation.
+- [x] Target size/address bounds.
+- [x] `OTA_CAP_DELTA_IMAGE` advertised.
+- [x] Frozen UART START payload reused.
+- [x] `FW_IMAGE_DELTA` accepted by STM32 application.
+- [x] Delta download remains resumable.
+- [x] Patch source is internal active application.
+- [x] Patch input is external Incoming Artifact.
+- [x] Patch output is external Reconstructed Image.
+- [x] Active internal application untouched during patching.
+- [x] 128-byte embedded patch I/O buffer.
+- [x] No dynamic allocation in embedded patch engine.
+- [x] EQL.
+- [x] MOD.
+- [x] INS.
+- [x] DEL.
+- [x] BKT compatibility.
+- [x] Escaped JojoDiff ESC handling.
+- [x] `VERIFYING_CONTAINER`.
+- [x] `VERIFYING_BASE`.
+- [x] `PATCHING`.
+- [x] `IMAGE_READY`.
+- [x] PATCHING restart-from-scratch recovery.
+- [x] Reconstructed candidate verified before backup/install.
+- [x] Existing Phase-8 backup reused.
+- [x] Existing Phase-7 page install checkpoint reused.
+- [x] Existing trial boot/confirm reused.
+- [x] Existing rollback reused.
+- [x] Full-image OTA source remains supported.
+- [x] PC `delta-ota` sender command.
+- [x] Embedded JanpatchPort exact host harness.
+- [x] Byte-for-byte embedded reconstruction host test.
+- [x] Phase-12 generator property regressions.
+- [x] Bootloader size enforcement <= 24 KiB.
+- [x] Application size enforcement <= 38 KiB.
+- [x] ST-Link final metadata verification runner.
+- [x] ST-Link installed-target byte comparison runner.
+- [x] Wrong-base hardware rejection runner.
+- [x] `make phase13-check`.
+- [x] `make phase13-hw-test PORT=...`.
+- [ ] Physical Phase-13 hardware test confirmed by user.
+- [ ] Signed container/authenticity — later phase.

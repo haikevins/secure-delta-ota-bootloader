@@ -20,6 +20,14 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def display_path(path: Path, root: Path) -> str:
+    """Return a repo-relative path when possible; absolute otherwise."""
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return str(path.resolve())
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser()
@@ -36,11 +44,11 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "dist/secure-delta-ota-phase11.bin",
+        default=root / "dist/secure-delta-ota-phase14-unprovisioned.bin",
     )
     parser.add_argument(
         "--label",
-        default="Phase 11",
+        default="Phase 14 (unprovisioned trust anchor)",
         help="manifest label only; does not change image layout",
     )
     args = parser.parse_args()
@@ -80,8 +88,8 @@ def main() -> None:
         ]),
         encoding="utf-8",
     )
-    print(f"Created {output.relative_to(root)} ({len(merged)} bytes)")
-    print(f"Created {manifest.relative_to(root)}")
+    print(f"Created {display_path(output, root)} ({len(merged)} bytes)")
+    print(f"Created {display_path(manifest, root)}")
 
 
 if __name__ == "__main__":
