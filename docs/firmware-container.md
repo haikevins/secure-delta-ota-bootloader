@@ -159,3 +159,13 @@ The following flags are not allowed in format version 1 implementation until exp
 - bootloader update;
 - chained delta patch;
 - writable calibration/configuration segments.
+
+
+## Phase 6 compatibility note
+
+The secure container format above remains the target format, but Phase 6 does
+not parse or authenticate it yet. The Phase-6 basic full OTA test transfers the
+raw linker-produced `application.bin`; the START payload plus the external
+handoff record carries image size, target version and CRC32. Secure container
+parsing/signature verification is introduced in later phases without changing
+the internal application load address.

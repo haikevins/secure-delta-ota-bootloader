@@ -26,3 +26,17 @@ make phase5-hw-test PORT=/dev/ttyUSB0
 ```
 
 Measured application binary: **8156 bytes** (Clang/LLD validation build).
+
+
+## Hardware result
+
+Confirmed on the real board:
+
+```text
+HELLO: PASS
+CRC NACK: PASS
+Sequence NACK: PASS
+Duplicate DATA ACK: PASS
+FINISH retry ACK: PASS
+Phase 5 UART protocol hardware self-test: PASS
+```

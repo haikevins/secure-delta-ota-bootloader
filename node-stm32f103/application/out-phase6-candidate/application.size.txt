@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+   8436	      8	   1944	  10388	   2894	out-phase6-candidate/application.elf

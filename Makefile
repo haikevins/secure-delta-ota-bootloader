@@ -1,11 +1,12 @@
 TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
 
 .PHONY: all phase0-check phase1-check phase2-check phase3-check phase4-check phase4-hw-test \
-        phase5-check phase5-hw-test bootloader application firmware combined \
+        phase5-check phase5-hw-test phase6-check phase6-candidate phase6-hw-test \
+        bootloader application firmware combined \
         flash-bootloader flash-application flash-combined dump-metadata erase-metadata \
         gateway tools test release clean toolchain-info
 
-all: phase5-check
+all: phase6-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -31,6 +32,20 @@ phase5-check: phase4-check
 phase5-hw-test:
 	@PORT="$(PORT)" python3 scripts/phase5_hw_test.py
 
+phase6-check: phase5-check
+	@$(TOOLCHAIN_ARG) python3 scripts/phase6_check.py
+
+phase6-candidate:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase6-candidate OUT_DIR=out-phase6-candidate \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase6-candidate OUT_DIR=out-phase6-candidate \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" all
+
+phase6-hw-test: phase6-candidate
+	@PORT="$(PORT)" python3 scripts/phase6_hw_test.py
+
 firmware: bootloader application
 
 bootloader:
@@ -40,7 +55,7 @@ application:
 	$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG)
 
 combined: firmware
-	@python3 tools/merge_images.py
+	@python3 tools/merge_images.py --output dist/secure-delta-ota-phase6.bin --label "Phase 6"
 
 flash-bootloader:
 	@bash scripts/flash_bootloader.sh
@@ -66,7 +81,7 @@ gateway:
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase5-check
+test: phase6-check
 
 release:
 	@echo "Signed release pipeline is Phase 15."
@@ -74,4 +89,6 @@ release:
 clean:
 	@$(MAKE) -C node-stm32f103/bootloader clean
 	@$(MAKE) -C node-stm32f103/application clean
+	@rm -rf node-stm32f103/application/build-phase6-candidate
+	@rm -rf node-stm32f103/application/out-phase6-candidate
 	@rm -rf gateway-esp32/build dist build-host

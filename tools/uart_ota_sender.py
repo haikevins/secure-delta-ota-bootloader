@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PC UART client for Secure Delta OTA Phase 5."""
+"""PC UART client for Secure Delta OTA Phase 5/6."""
 from __future__ import annotations
 
 import argparse
@@ -8,7 +8,7 @@ import sys
 import time
 
 from ota_uart_protocol import (
-    CMD_ABORT, CMD_ACK, CMD_DATA, CMD_FINISH, CMD_HELLO, CMD_NACK,
+    CMD_ABORT, CMD_ACK, CMD_DATA, CMD_FINISH, CMD_HELLO, CMD_INSTALL, CMD_NACK,
     CMD_QUERY, CMD_RESUME, CMD_START, CMD_STATUS,
     Packet, ProtocolError,
     STATUS_OK, STATUS_PACKET_CRC_ERROR, STATUS_WRONG_SEQUENCE,
@@ -21,6 +21,10 @@ DEFAULT_BAUD = 115200
 DEFAULT_TIMEOUT = 1.5
 DEFAULT_RETRIES = 5
 MAX_ARTIFACT = 128 * 1024
+MAX_APPLICATION = 38 * 1024
+APPLICATION_ADDRESS = 0x08006000
+SRAM_BASE = 0x20000000
+SRAM_END = 0x20005000
 
 def require_pyserial():
     try:
@@ -134,7 +138,7 @@ def control(link: SerialLink, command: int, update_id: int = 0):
     )
     return info
 
-def transfer(link: SerialLink, data: bytes, update_id: int) -> None:
+def transfer(link: SerialLink, data: bytes, update_id: int, target_version: int = 0) -> None:
     if not data:
         raise ProtocolError("artifact must not be empty")
     if len(data) > MAX_ARTIFACT:
@@ -155,7 +159,7 @@ def transfer(link: SerialLink, data: bytes, update_id: int) -> None:
         link.request(Packet(
             command=CMD_START,
             update_id=update_id,
-            payload=build_start_payload(len(data), artifact_crc)
+            payload=build_start_payload(len(data), artifact_crc, target_version=target_version)
         )),
         "START"
     )
@@ -187,6 +191,94 @@ def transfer(link: SerialLink, data: bytes, update_id: int) -> None:
     print(
         f"Transfer PASS update_id=0x{update_id:08X} "
         f"size={len(data)} crc32=0x{artifact_crc:08X}"
+    )
+
+
+def wait_for_application_version(link: SerialLink,
+                                 target_version: int,
+                                 wait_seconds: float = 20.0):
+    deadline = time.monotonic() + wait_seconds
+    old_timeout = link.timeout
+    old_retries = link.retries
+    link.timeout = 0.6
+    link.retries = 1
+    try:
+        time.sleep(0.25)
+        link.serial.reset_input_buffer()
+        sequence = 0
+        while time.monotonic() < deadline:
+            try:
+                response = link.request(Packet(
+                    command=CMD_HELLO, update_id=0, sequence=sequence
+                ))
+                info = parse_hello(response)
+                if info.application_version == target_version:
+                    return info
+            except (TimeoutError, ProtocolError, OSError):
+                pass
+            sequence = (sequence + 1) & 0xFFFF
+            time.sleep(0.15)
+    finally:
+        link.timeout = old_timeout
+        link.retries = old_retries
+    raise TimeoutError(
+        f"updated application version 0x{target_version:08X} "
+        f"did not appear within {wait_seconds:.1f}s"
+    )
+
+
+def validate_application_binary(data: bytes) -> None:
+    if not 8 <= len(data) <= MAX_APPLICATION:
+        raise ProtocolError(
+            f"application size must be 8..{MAX_APPLICATION} bytes"
+        )
+    initial_msp = int.from_bytes(data[0:4], "little")
+    reset_handler = int.from_bytes(data[4:8], "little")
+    if not SRAM_BASE <= initial_msp <= SRAM_END or (initial_msp & 7):
+        raise ProtocolError(f"invalid application MSP 0x{initial_msp:08X}")
+    if (reset_handler & 1) == 0:
+        raise ProtocolError(
+            f"application Reset_Handler is not Thumb: 0x{reset_handler:08X}"
+        )
+    reset_code = reset_handler & ~1
+    if not APPLICATION_ADDRESS <= reset_code < APPLICATION_ADDRESS + len(data):
+        raise ProtocolError(
+            f"application Reset_Handler outside image: 0x{reset_handler:08X}"
+        )
+
+def full_ota(link: SerialLink, data: bytes,
+             update_id: int, target_version: int) -> None:
+    if target_version == 0:
+        raise ProtocolError("target_version must be non-zero")
+    validate_application_binary(data)
+
+    transfer(link, data, update_id, target_version=target_version)
+
+    install_packet = Packet(
+        command=CMD_INSTALL,
+        update_id=update_id,
+        offset=len(data),
+        sequence=0,
+    )
+
+    try:
+        install_response = link.request(install_packet)
+        require_ack(install_response, "INSTALL")
+        print("INSTALL ACK: PASS; waiting for bootloader install/reboot")
+    except TimeoutError:
+        # The ACK can be lost exactly at reset. The authoritative success check
+        # is that the new application comes back and identifies its version.
+        print("INSTALL ACK not observed; waiting for updated application")
+
+    info = wait_for_application_version(link, target_version)
+    if info.update_state != UPDATE_IDLE:
+        raise ProtocolError(
+            f"updated application returned unexpected state={info.update_state}"
+        )
+
+    print(
+        f"Full OTA PASS update_id=0x{update_id:08X} "
+        f"target_version=0x{target_version:08X} size={len(data)}"
     )
 
 def self_test(link: SerialLink, size: int, update_id: int) -> None:
@@ -291,6 +383,10 @@ def main() -> int:
     send = sub.add_parser("send")
     send.add_argument("file", type=Path)
     send.add_argument("--update-id", type=parse_u32)
+    ota = sub.add_parser("ota")
+    ota.add_argument("file", type=Path)
+    ota.add_argument("--update-id", type=parse_u32)
+    ota.add_argument("--target-version", type=parse_u32, required=True)
     test = sub.add_parser("self-test")
     test.add_argument("--size", type=int, default=1024)
     test.add_argument("--update-id", type=parse_u32, default=0x50050001)
@@ -316,6 +412,14 @@ def main() -> int:
                 if update_id == 0:
                     update_id = 1
             transfer(link, data, update_id)
+        elif args.action == "ota":
+            data = args.file.read_bytes()
+            update_id = args.update_id
+            if update_id is None:
+                update_id = int(time.time_ns()) & 0xFFFFFFFF
+                if update_id == 0:
+                    update_id = 1
+            full_ota(link, data, update_id, args.target_version)
         elif args.action == "self-test":
             self_test(link, args.size, args.update_id)
     except (ProtocolError, TimeoutError, OSError) as exc:

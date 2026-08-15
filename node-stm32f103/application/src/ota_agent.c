@@ -7,6 +7,7 @@
 #include "ota_response.h"
 #include "ota_status.h"
 #include "uart.h"
+#include "stm32f10x.h"
 
 static OtaParser_t g_parser;
 static uint32_t g_last_rx_overflow_count;
@@ -65,6 +66,11 @@ void OtaAgent_Process(void)
         {
             OtaReceiver_ProcessPacket(&request, &response);
             (void)SendPacket(&response);
+            if (OtaReceiver_ShouldReset())
+            {
+                __DSB();
+                NVIC_SystemReset();
+            }
         }
         else if (event == OTA_PARSER_EVENT_PACKET_CRC_ERROR)
         {

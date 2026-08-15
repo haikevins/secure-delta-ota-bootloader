@@ -167,7 +167,9 @@ BootMetadataValidationStatus_t BootMetadata_Validate(
 uint8_t BootMetadata_IsGenerationNewer(uint32_t candidate,
                                        uint32_t reference)
 {
-    return (uint8_t)(((int32_t)(candidate - reference)) > 0);
+    const uint32_t difference = candidate - reference;
+    return (uint8_t)((difference != 0UL) &&
+                     (difference < 0x80000000UL));
 }
 
 uint32_t BootMetadata_NextGeneration(uint32_t current_generation)

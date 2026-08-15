@@ -1,11 +1,16 @@
 #include "ota_receiver.h"
+
 #include "boot_metadata.h"
 #include "crc32.h"
 #include "external_flash_storage.h"
 #include "firmware_container.h"
+#include "full_image_validation.h"
 #include "memory_map.h"
+#include "metadata_storage.h"
 #include "ota_status.h"
 #include "spi_flash.h"
+#include "update_handoff.h"
+#include "update_handoff_storage.h"
 
 typedef struct
 {
@@ -13,7 +18,9 @@ typedef struct
     uint8_t last_status;
     uint8_t storage_ready;
     uint8_t has_last_data;
+    uint8_t reset_pending;
     uint32_t update_id;
+    uint32_t target_version;
     uint32_t expected_size;
     uint32_t next_offset;
     uint32_t artifact_crc32;
@@ -44,12 +51,14 @@ static void ResetTransfer(void)
 {
     g_session.state = (uint8_t)UPDATE_IDLE;
     g_session.update_id = 0UL;
+    g_session.target_version = 0UL;
     g_session.expected_size = 0UL;
     g_session.next_offset = 0UL;
     g_session.artifact_crc32 = 0UL;
     g_session.erased_sector_bitmap = 0UL;
     g_session.expected_sequence = 0U;
     g_session.has_last_data = 0U;
+    g_session.reset_pending = 0U;
     g_session.last_data_offset = 0UL;
     g_session.last_data_sequence = 0U;
     g_session.last_data_length = 0U;
@@ -175,6 +184,7 @@ static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
 {
     uint8_t artifact_type;
     uint16_t container_version;
+    uint32_t target_version;
     uint32_t artifact_size;
     uint32_t artifact_crc32;
 
@@ -204,6 +214,7 @@ static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
 
     artifact_type = request->payload[0];
     container_version = GetU16Le(&request->payload[2]);
+    target_version = GetU32Le(&request->payload[8]);
     artifact_size = GetU32Le(&request->payload[12]);
     artifact_crc32 = GetU32Le(&request->payload[16]);
 
@@ -226,12 +237,14 @@ static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
 
     g_session.state = (uint8_t)UPDATE_RECEIVING;
     g_session.update_id = request->update_id;
+    g_session.target_version = target_version;
     g_session.expected_size = artifact_size;
     g_session.next_offset = 0UL;
     g_session.artifact_crc32 = artifact_crc32;
     g_session.erased_sector_bitmap = 0UL;
     g_session.expected_sequence = 0U;
     g_session.has_last_data = 0U;
+    g_session.reset_pending = 0U;
     Ack(request, response);
 }
 
@@ -330,7 +343,6 @@ static void ProcessFinish(const OtaPacket_t *request, OtaPacket_t *response)
         return;
     }
 
-    /* FINISH is idempotent so an ACK lost on UART can be retried safely. */
     if ((g_session.state == (uint8_t)UPDATE_ARTIFACT_READY) &&
         (request->update_id == g_session.update_id) &&
         (g_session.next_offset == g_session.expected_size))
@@ -374,6 +386,132 @@ static void ProcessFinish(const OtaPacket_t *request, OtaPacket_t *response)
     Ack(request, response);
 }
 
+static bool ValidateIncomingApplication(uint32_t *detail)
+{
+    uint8_t vector[8];
+    FullImageValidationStatus_t status;
+
+    if (!ExternalFlashStorage_Read(EXTERNAL_FLASH_PARTITION_INCOMING,
+                                   0UL, vector, sizeof(vector)))
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = (uint32_t)SpiFlash_GetLastStatus();
+        }
+        return false;
+    }
+
+    status = FullImage_ValidateVector(g_session.expected_size,
+                                     GetU32Le(&vector[0]),
+                                     GetU32Le(&vector[4]));
+    if (detail != (uint32_t *)0) { *detail = (uint32_t)status; }
+    return status == FULL_IMAGE_VALID;
+}
+
+static bool PersistInstallRequest(uint32_t *detail)
+{
+    UpdateHandoffRecord_t record;
+    UpdateHandoffRecord_t committed_record;
+    BootMetadata_t metadata;
+    BootMetadata_t committed_metadata;
+    MetadataStorageStatus_t metadata_status;
+    UpdateHandoffStorageStatus_t handoff_status;
+
+    UpdateHandoff_Init(&record,
+                       g_session.update_id,
+                       g_session.target_version,
+                       g_session.expected_size,
+                       g_session.artifact_crc32);
+
+    handoff_status = UpdateHandoffStorage_Commit(&record,
+                                                 &committed_record,
+                                                 (UpdateHandoffSlot_t *)0);
+    if (handoff_status != UPDATE_HANDOFF_STORAGE_OK)
+    {
+        if (detail != (uint32_t *)0) { *detail = (uint32_t)handoff_status; }
+        return false;
+    }
+
+    metadata_status = MetadataStorage_Load(&metadata, (BootMetadataSlot_t *)0);
+    if ((metadata_status != METADATA_STORAGE_OK) &&
+        (metadata_status != METADATA_STORAGE_DEFAULTS_USED))
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x100UL | (uint32_t)metadata_status;
+        }
+        return false;
+    }
+
+    metadata.state = (uint32_t)UPDATE_ARTIFACT_READY;
+    metadata.pending_version = committed_record.target_version;
+    metadata.active_update_id = committed_record.update_id;
+    metadata.received_size = committed_record.image_size;
+    metadata.expected_size = committed_record.image_size;
+    metadata.copy_offset = 0UL;
+    metadata.boot_attempts = 0UL;
+    metadata.last_error = 0UL;
+
+    metadata_status = MetadataStorage_Commit(&metadata,
+                                             &committed_metadata,
+                                             (BootMetadataSlot_t *)0);
+    if (metadata_status != METADATA_STORAGE_OK)
+    {
+        if (detail != (uint32_t *)0)
+        {
+            *detail = 0x200UL | (uint32_t)metadata_status;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+static void ProcessInstall(const OtaPacket_t *request, OtaPacket_t *response)
+{
+    uint32_t detail = 0UL;
+
+    if (request->payload_length != 0U)
+    {
+        Nack(request, OTA_STATUS_INVALID_PACKET, 0UL, response);
+        return;
+    }
+    if (g_session.state != (uint8_t)UPDATE_ARTIFACT_READY)
+    {
+        Nack(request, OTA_STATUS_INVALID_STATE, 0UL, response);
+        return;
+    }
+    if (request->update_id != g_session.update_id)
+    {
+        Nack(request, OTA_STATUS_UPDATE_ID_MISMATCH, 0UL, response);
+        return;
+    }
+    if (g_session.target_version == 0UL)
+    {
+        Nack(request, OTA_STATUS_VERSION_REJECTED, 0UL, response);
+        return;
+    }
+    if (g_session.expected_size > APPLICATION_MAX_SIZE)
+    {
+        Nack(request, OTA_STATUS_IMAGE_TOO_LARGE,
+             g_session.expected_size, response);
+        return;
+    }
+    if (!ValidateIncomingApplication(&detail))
+    {
+        Nack(request, OTA_STATUS_CONTAINER_ERROR, detail, response);
+        return;
+    }
+    if (!PersistInstallRequest(&detail))
+    {
+        Nack(request, OTA_STATUS_INTERNAL_ERROR, detail, response);
+        return;
+    }
+
+    Ack(request, response);
+    g_session.reset_pending = 1U;
+}
+
 bool OtaReceiver_Init(void)
 {
     g_session.storage_ready = ExternalFlashStorage_Init() ? 1U : 0U;
@@ -385,6 +523,11 @@ bool OtaReceiver_Init(void)
                                       : (uint32_t)SpiFlash_GetLastStatus();
     ResetTransfer();
     return g_session.storage_ready != 0U;
+}
+
+bool OtaReceiver_ShouldReset(void)
+{
+    return g_session.reset_pending != 0U;
 }
 
 void OtaReceiver_ProcessPacket(const OtaPacket_t *request,
@@ -455,6 +598,9 @@ void OtaReceiver_ProcessPacket(const OtaPacket_t *request,
             return;
 
         case OTA_CMD_INSTALL:
+            ProcessInstall(request, response);
+            return;
+
         case OTA_CMD_CONFIRM:
             Nack(request, OTA_STATUS_INVALID_STATE, 0UL, response);
             return;

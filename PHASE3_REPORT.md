@@ -26,13 +26,14 @@ to a 38 KiB application plus two 1 KiB metadata pages. This is necessary for
 power-loss-safe A/B commits on STM32F103, whose internal Flash erase page is
 1 KiB.
 
-## Validation boundary
+## Validation result
 
-The automated check validates builds, ELF symbols, linker bounds, CRC vectors,
+Automated validation covers builds, ELF symbols, linker bounds, CRC vectors,
 record corruption, redundant selection, generation wrap and boot-decision
-mapping. Physical Flash power-cut behavior still requires Blue Pill testing.
+mapping.
 
-## Next phase
+Hardware validation has also been completed on the Blue Pill: first-boot
+metadata initialization, A/B newest-generation selection, corrupted-slot CRC
+fallback, and return to the application were all confirmed.
 
-Phase 4 implements the W25Q32 SPI NOR driver and external storage partitions.
-It must not add UART OTA transport yet.
+Later phases build on this unchanged 52-byte internal metadata format.

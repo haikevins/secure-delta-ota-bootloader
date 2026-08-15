@@ -44,8 +44,9 @@ Secure Delta OTA Phase 3 metadata/boot-decision check: PASS
 5. Corrupt one word in slot A while a valid slot B exists; bootloader must select B.
 6. Set a valid later-phase state and confirm the nine-pulse recovery indication.
 
-The archive-generation environment cannot perform steps 1–6 because no Blue
-Pill is connected.
+These checks have been confirmed on the real Blue Pill, including selection
+of a newer valid B slot, fallback to A after corrupting B's CRC, and successful
+return to the application with `VTOR=0x08006000`.
 
 ## Metadata inspection
 

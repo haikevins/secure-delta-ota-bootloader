@@ -1,8 +1,8 @@
 # Custom UART OTA Protocol Version 1
 
-Status: **Protocol v1 frozen in Phase 0; UART/PC implementation added in Phase 5**
+Status: **Protocol v1 frozen in Phase 0; UART/PC implemented in Phase 5; basic INSTALL handoff implemented in Phase 6**
 
-Phase 5 uses same-boot resume only. Persistent power-loss recovery remains a later phase.
+Phase 5/6 download progress is same-boot only. Persistent per-chunk recovery remains Phase 7.
 
 ## 1. Physical UART configuration
 
@@ -167,7 +167,8 @@ An accepted START returns `ACK` with `next_expected_offset = 0`.
 - Node validates packet CRC before storage.
 - Node writes bytes to `EXT_INCOMING_ADDRESS + offset`.
 - Node verifies the written bytes or uses a storage policy that guarantees verification before ACK.
-- ACK is sent only after metadata can recover the acknowledged progress.
+- ACK is sent only after the DATA bytes have been written and verified in external Flash.
+- Phase 6 does not persist every acknowledged DATA offset; per-chunk power-loss recovery is Phase 7.
 
 ### Duplicate handling
 
@@ -187,14 +188,23 @@ last_error_detail         u32
 
 ## 11. FINISH behavior
 
-The node checks:
+The Phase-6 full-image node checks:
 
 1. `received_size == expected_artifact_size`;
-2. complete incoming artifact CRC32;
-3. minimum container header parsing and bounds;
-4. metadata commit to `ARTIFACT_READY`.
+2. complete incoming artifact CRC32.
 
-FINISH does not perform installation. Installation occurs only after INSTALL or local policy resets into bootloader.
+FINISH moves the **runtime receiver** to `ARTIFACT_READY` but does not yet
+persist the bootloader handoff and does not reset the MCU.
+
+For a basic full-image INSTALL, `INSTALL (0x20)` then:
+
+1. validates target version, image size and vector table;
+2. writes the CRC-protected external Metadata A/B handoff record;
+3. commits internal Metadata A/B as `UPDATE_ARTIFACT_READY`;
+4. transmits ACK completely;
+5. resets into the bootloader.
+
+Secure container parsing/signature verification is added in later phases.
 
 ## 12. RESUME behavior
 

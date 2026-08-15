@@ -39,16 +39,15 @@ make phase4-hw-test
 
 Pass criteria:
 
-- [ ] JEDEC ID = `0xEF4016` (W25Q32) or `0xEF4017` (W25Q64).
-- [ ] Test sector erase and full blank-check succeed.
-- [ ] Cross-page write succeeds.
-- [ ] Readback and explicit verify succeed.
-- [ ] Out-of-partition request is rejected.
-- [ ] Final erase and blank-check succeed.
-- [ ] `P4_STATUS=0x50415353`.
+- [x] JEDEC ID = `0xEF4016` (W25Q32) or `0xEF4017` (W25Q64).
+- [x] Test sector erase and full blank-check succeed.
+- [x] Cross-page write succeeds.
+- [x] Readback and explicit verify succeed.
+- [x] Out-of-partition request is rejected.
+- [x] Final erase and blank-check succeed.
+- [x] `P4_STATUS=0x50415353`.
 
-The repository-only check cannot prove physical wiring or real Flash
-program/erase behavior; those are confirmed by the hardware test.
+Physical validation has been confirmed with JEDEC `0xEF4017` (W25Q64), `P4_STATUS=0x50415353`, and driver status zero.
 
 
 ### OpenOCD connection profile

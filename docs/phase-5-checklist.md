@@ -18,6 +18,6 @@
 - [x] Host C/Python tests.
 - [x] `make phase5-check`.
 - [x] `make phase5-hw-test PORT=...` runner.
-- [ ] Physical UART hardware test confirmed.
+- [x] Physical UART hardware test confirmed on STM32F103 + W25Q64.
 - [ ] Persistent power-loss resume (later phase).
-- [ ] Firmware installation (Phase 6).
+- [x] Firmware installation path implemented in Phase 6.

@@ -1,9 +1,28 @@
 #ifndef IMAGE_INSTALLER_H
 #define IMAGE_INSTALLER_H
 
-/* image_installer interface
- * Project status: Phase 0 skeleton.
- * Planned implementation: Phase 2+.
- */
+#include "boot_metadata.h"
+
+typedef enum
+{
+    IMAGE_INSTALLER_OK = 0,
+    IMAGE_INSTALLER_SOURCE_REJECTED,
+    IMAGE_INSTALLER_EXTERNAL_FLASH_INIT_FAILED,
+    IMAGE_INSTALLER_HANDOFF_LOAD_FAILED,
+    IMAGE_INSTALLER_HANDOFF_MISMATCH,
+    IMAGE_INSTALLER_SOURCE_READ_FAILED,
+    IMAGE_INSTALLER_SOURCE_VECTOR_INVALID,
+    IMAGE_INSTALLER_SOURCE_CRC_MISMATCH,
+    IMAGE_INSTALLER_METADATA_COMMIT_FAILED,
+    IMAGE_INSTALLER_FLASH_ERASE_FAILED,
+    IMAGE_INSTALLER_FLASH_PROGRAM_FAILED,
+    IMAGE_INSTALLER_VERIFY_CRC_FAILED,
+    IMAGE_INSTALLER_VERIFY_VECTOR_FAILED,
+    IMAGE_INSTALLER_FINALIZE_FAILED
+} ImageInstallerStatus_t;
+
+ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(
+    const BootMetadata_t *metadata,
+    BootMetadata_t *result_metadata);
 
 #endif

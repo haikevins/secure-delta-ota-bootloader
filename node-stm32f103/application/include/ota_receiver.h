@@ -9,5 +9,6 @@ bool OtaReceiver_Init(void);
 void OtaReceiver_ProcessPacket(const OtaPacket_t *request,
                                OtaPacket_t *response);
 void OtaReceiver_GetResponseInfo(OtaResponseInfo_t *info);
+bool OtaReceiver_ShouldReset(void);
 
 #endif

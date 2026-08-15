@@ -105,7 +105,7 @@ def main() -> None:
         if name not in table:
             fail(f"missing symbol {name}")
 
-    run(["python3", "tools/merge_images.py"])
+    run(["python3", "tools/merge_images.py", "--output", "dist/secure-delta-ota-phase5.bin", "--label", "Phase 5"])
     if not (ROOT / "dist/secure-delta-ota-phase5.bin").is_file():
         fail("Phase 5 combined image missing")
 

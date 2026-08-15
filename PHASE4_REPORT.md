@@ -27,3 +27,15 @@ The physical test runner uses `hla_swd`, `reset_config none`, and adapter speed
 1000 kHz. Phase 4 accepts JEDEC `0xEF4016` (W25Q32) and `0xEF4017` (W25Q64).
 The logical OTA partition map remains 4 MiB, so the upper half of W25Q64 is not
 used by this project.
+
+
+## Hardware validation result
+
+Confirmed on the real board with W25Q64:
+
+```text
+P4_STATUS=0x50415353
+P4_JEDEC=0x00EF4017
+P4_DRIVER_STATUS=0x00000000
+Phase 4 hardware SPI Flash test: PASS
+```

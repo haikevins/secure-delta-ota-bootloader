@@ -1,0 +1,29 @@
+# Phase 6 Checklist — Basic Full OTA
+
+- [x] Raw full application image transfer from PC.
+- [x] Target version carried in START payload.
+- [x] Explicit INSTALL command.
+- [x] Incoming image size limited to internal 38 KiB before install.
+- [x] Incoming vector validation before destructive internal erase.
+- [x] CRC32 expected value survives reset.
+- [x] External Metadata A/B handoff record.
+- [x] CRC-last external handoff commit.
+- [x] Internal Metadata A/B handoff commit.
+- [x] INSTALL ACK transmitted before reset.
+- [x] Bootloader handles ARTIFACT_READY.
+- [x] Bootloader handles INSTALLING.
+- [x] Bootloader handles VERIFYING_INSTALL.
+- [x] Full incoming CRC32 checked before erase.
+- [x] Complete application partition erase without touching metadata.
+- [x] Halfword internal Flash programming.
+- [x] Installed CRC32 verification.
+- [x] Installed vector verification.
+- [x] Active version finalized in internal metadata.
+- [x] Candidate v2 build target.
+- [x] PC waits for HELLO reporting v2.
+- [x] Phase-6 host tests.
+- [x] Phase-6 build/link check.
+- [ ] Physical full OTA hardware test confirmed.
+- [ ] Per-page copy checkpoint/recovery (Phase 7).
+- [ ] Backup/trial/rollback (Phase 8).
+- [ ] Cryptographic authenticity (later secure-container phase).

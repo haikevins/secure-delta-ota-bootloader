@@ -53,7 +53,8 @@ Nominal size: 4 MiB, `0x000000`–`0x3FFFFF`.
 
 | Region | Start | End | Size | Purpose |
 |---|---:|---:|---:|---|
-| External Metadata A/B | `0x000000` | `0x001FFF` | 8 KiB | Future mirrored/extended metadata |
+| External Metadata A | `0x000000` | `0x000FFF` | 4 KiB | Phase-6 install handoff record A |
+| External Metadata B | `0x001000` | `0x001FFF` | 4 KiB | Phase-6 install handoff record B |
 | Incoming Artifact | `0x002000` | `0x021FFF` | 128 KiB | Full/delta secure container |
 | Reconstructed Image | `0x022000` | `0x041FFF` | 128 KiB | Reconstructed target image |
 | Backup Image | `0x042000` | `0x061FFF` | 128 KiB | Verified active-image backup |
@@ -61,3 +62,5 @@ Nominal size: 4 MiB, `0x000000`–`0x3FFFFF`.
 | Reserved | `0x072000` | `0x3FEFFF` | Remaining | Future use |\n| Phase 4 Self-test | `0x3FF000` | `0x3FFFFF` | 4 KiB | Destructive driver validation |
 
 The Phase 4 driver and storage abstraction enforce these bounds. External metadata does not replace the two internal boot-critical records introduced in Phase 3.
+
+Phase 6 uses only the first 36 bytes of each 4 KiB external metadata sector for the A/B install handoff record. The rest remains reserved for future extended metadata.

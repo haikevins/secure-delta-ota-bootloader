@@ -1,7 +1,7 @@
 # Secure Delta OTA Bootloader
 
 Reference project for **STM32F103C8T6 + ESP32 + external SPI NOR Flash** using
-**SPL/CMSIS**, not HAL.
+**STM32 SPL/CMSIS**, not HAL.
 
 ## Status
 
@@ -10,32 +10,38 @@ Reference project for **STM32F103C8T6 + ESP32 + external SPI NOR Flash** using
 - Phase 2 — Application handoff: complete + hardware verified.
 - Phase 3 — Metadata/boot decision: complete + hardware verified.
 - Phase 4 — External SPI Flash: complete + hardware verified.
-- Phase 5 — UART protocol with PC Python: implemented; hardware test provided.
+- Phase 5 — UART protocol with PC Python: complete + hardware verified.
+- Phase 6 — Basic Full OTA: implemented; end-to-end hardware test provided.
 
-## Phase 5 path
+## Phase 6 path
 
 ```text
 PC Python
   -> USART1 115200 8-N-1
-  -> COBS + 0x00 + packet CRC32
-  -> STM32 application
-  -> Incoming Artifact partition
+  -> COBS + packet CRC32
+  -> running STM32 application
+  -> W25Q Incoming Artifact
+  -> INSTALL
+  -> reset to bootloader
+  -> validate / erase / program / verify
+  -> boot updated application
 ```
 
-Phase 5 stops at `UPDATE_ARTIFACT_READY`; installation starts in Phase 6.
+Phase 6 uses a raw application binary and CRC32. It deliberately does not claim
+cryptographic security yet.
 
 ## Build
 
 ```bash
-make phase5-check
+make phase6-check
+make combined
 make flash-combined
 ```
 
-`make combined` creates:
+Combined image:
 
 ```text
-dist/secure-delta-ota-phase5.bin
-dist/secure-delta-ota-phase5.txt
+dist/secure-delta-ota-phase6.bin
 ```
 
 ## UART wiring
@@ -48,12 +54,30 @@ GND     -> USB-UART GND
 
 Use 3.3 V UART logic.
 
-Install PC dependency and test:
+## Phase 5 protocol regression
 
 ```bash
 python3 -m pip install -r tools/requirements-phase5.txt
-python3 tools/uart_ota_sender.py --port /dev/ttyUSB0 hello
 make phase5-hw-test PORT=/dev/ttyUSB0
 ```
 
-See `docs/phase-5-uart-pc-protocol.md` and `PHASE5_REPORT.md`.
+## Phase 6 end-to-end OTA
+
+Prepare a clean normal-v1 baseline:
+
+```bash
+make erase-metadata
+make flash-combined
+```
+
+Then build/send a v2 candidate:
+
+```bash
+make phase6-hw-test PORT=/dev/ttyUSB0
+```
+
+See:
+
+- `docs/phase-6-full-ota-basic.md`
+- `docs/phase-6-checklist.md`
+- `PHASE6_REPORT.md`

@@ -7,13 +7,17 @@ LOCAL_C_SOURCES := \
   src/boot_manager.c \
   src/boot_decision.c \
   src/application_jump.c \
+  src/image_installer.c \
   storage/metadata_storage.c \
   platform/system_clock.c \
   $(ROOT_DIR)/shared/src/crc32.c \
   $(ROOT_DIR)/shared/src/boot_metadata.c \
   $(ROOT_DIR)/shared/src/ext_flash_layout.c \
+  $(ROOT_DIR)/shared/src/full_image_validation.c \
+  $(ROOT_DIR)/shared/src/update_handoff.c \
   $(ROOT_DIR)/node-stm32f103/common/drivers/spi_flash.c \
-  $(ROOT_DIR)/node-stm32f103/common/storage/external_flash_storage.c
+  $(ROOT_DIR)/node-stm32f103/common/storage/external_flash_storage.c \
+  $(ROOT_DIR)/node-stm32f103/common/storage/update_handoff_storage.c
 LOCAL_ASM_SOURCES := \
   startup/startup_stm32f10x_md.s \
   startup/application_handoff.s

@@ -36,9 +36,16 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "dist/secure-delta-ota-phase5.bin",
+        default=root / "dist/secure-delta-ota-phase6.bin",
+    )
+    parser.add_argument(
+        "--label",
+        default="Phase 6",
+        help="manifest label only; does not change image layout",
     )
     args = parser.parse_args()
+
+    output = args.output if args.output.is_absolute() else (root / args.output)
 
     bootloader = args.bootloader.read_bytes()
     application = args.application.read_bytes()
@@ -54,12 +61,12 @@ def main() -> None:
     merged[: len(bootloader)] = bootloader
     merged[application_offset : application_offset + len(application)] = application
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_bytes(merged)
-    manifest = args.output.with_suffix(".txt")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(merged)
+    manifest = output.with_suffix(".txt")
     manifest.write_text(
         "\n".join([
-            "Secure Delta OTA Phase 5 combined image",
+            f"Secure Delta OTA {args.label} combined image",
             f"flash_base=0x{FLASH_BASE:08X}",
             f"bootloader_size={len(bootloader)}",
             f"application_address=0x{APPLICATION_ADDRESS:08X}",
@@ -68,12 +75,12 @@ def main() -> None:
             "metadata_a_and_b=left_erased_for_first_boot_initialization",
             f"bootloader_sha256={sha256(args.bootloader)}",
             f"application_sha256={sha256(args.application)}",
-            f"combined_sha256={sha256(args.output)}",
+            f"combined_sha256={sha256(output)}",
             "",
         ]),
         encoding="utf-8",
     )
-    print(f"Created {args.output.relative_to(root)} ({len(merged)} bytes)")
+    print(f"Created {output.relative_to(root)} ({len(merged)} bytes)")
     print(f"Created {manifest.relative_to(root)}")
 
 

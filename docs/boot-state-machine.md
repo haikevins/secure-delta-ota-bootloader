@@ -1,6 +1,6 @@
 # Boot and Update State Machine
 
-Status: **Phase 3 metadata validation, redundancy and boot decision implemented**
+Status: **Phase 6 basic full-image install actions implemented; later delta/rollback states remain planned**
 
 ## 1. Update states
 
@@ -82,6 +82,31 @@ Any unrecoverable validation/storage error -> FAILED.
 FAILED permits a new START after explicit cleanup.
 ```
 
+
+## Phase 6 implemented path
+
+For the current basic full-image updater, the implemented path is intentionally
+shorter than the final state diagram:
+
+```text
+RECEIVING -> ARTIFACT_READY
+                 |
+              INSTALL
+                 |
+              reset
+                 v
+          [validate source]
+                 |
+            INSTALLING
+                 |
+        VERIFYING_INSTALL
+                 |
+               IDLE
+```
+
+`IMAGE_READY`, `BACKING_UP`, `TRIAL_BOOT`, `CONFIRMED` and `ROLLBACK` remain
+reserved for later phases. Phase 6 does not claim backup or rollback safety.
+
 ## 3. Boot decision order
 
 On reset, the bootloader performs:
@@ -137,7 +162,7 @@ typedef struct
 } BootMetadata_t;
 ```
 
-Internal Flash contains complete Metadata A and B records in separate 1 KiB erase pages at `0x0800F800` and `0x0800FC00`. A new record is written to the older/invalid page, read back, CRC-validated and byte-compared. The currently selected page is not erased until a newer verified copy exists. External metadata remains reserved for later extended state.
+Internal Flash contains complete Metadata A and B records in separate 1 KiB erase pages at `0x0800F800` and `0x0800FC00`. A new record is written to the older/invalid page, read back, CRC-validated and byte-compared. The currently selected page is not erased until a newer verified copy exists. External Metadata A/B is used from Phase 6 for the 36-byte CRC-protected application-to-bootloader install handoff; the remaining sector space is reserved.
 
 ## 5. Application validity
 

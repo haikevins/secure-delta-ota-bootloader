@@ -25,6 +25,6 @@ else
 fi
 
 make -C "$ROOT_DIR" combined "${MAKE_ARGS[@]}"
-IMAGE="$ROOT_DIR/dist/secure-delta-ota-phase5.bin"
+IMAGE="$ROOT_DIR/dist/secure-delta-ota-phase6.bin"
 "$OPENOCD_BIN" -f "$INTERFACE_CFG" -f "$TARGET_CFG" \
     -c "program $IMAGE 0x08000000 verify reset exit"

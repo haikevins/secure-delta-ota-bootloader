@@ -5,6 +5,7 @@
 #include "application_jump.h"
 #include "boot_decision.h"
 #include "boot_metadata.h"
+#include "image_installer.h"
 #include "metadata_storage.h"
 #include "memory_map.h"
 #include "stm32f10x.h"
@@ -22,6 +23,7 @@
 #define ERROR_PAUSE_MS              900UL
 #define METADATA_ERROR_PULSES       8UL
 #define RECOVERY_ACTION_PULSES      9UL
+#define INSTALL_ERROR_PULSES        10UL
 
 static volatile uint32_t g_boot_tick_ms;
 
@@ -132,6 +134,13 @@ static uint8_t BootManager_ActionCanJump(BootAction_t action)
                      (action == BOOT_ACTION_BOOT_TRIAL));
 }
 
+static uint8_t BootManager_ActionNeedsBasicInstall(BootAction_t action)
+{
+    return (uint8_t)((action == BOOT_ACTION_PROCESS_ARTIFACT) ||
+                     (action == BOOT_ACTION_RESUME_INSTALL) ||
+                     (action == BOOT_ACTION_VERIFY_INSTALL));
+}
+
 void BootManager_Run(void)
 {
     ApplicationVector_t application_vector;
@@ -141,6 +150,7 @@ void BootManager_Run(void)
     BootMetadataSlot_t active_slot;
     MetadataStorageStatus_t storage_status;
     BootDecision_t decision;
+    ImageInstallerStatus_t installer_status;
     uint8_t application_valid;
 
     BootManager_LedInit();
@@ -179,6 +189,30 @@ void BootManager_Run(void)
                                   APPLICATION_VALIDATION_OK);
 
     decision = BootDecision_Evaluate(&metadata, application_valid);
+
+    if (BootManager_ActionNeedsBasicInstall(decision.action) != 0U)
+    {
+        installer_status = ImageInstaller_ProcessBasicFull(&metadata,
+                                                           &committed_metadata);
+        if ((installer_status == IMAGE_INSTALLER_OK) ||
+            (installer_status == IMAGE_INSTALLER_SOURCE_REJECTED))
+        {
+            metadata = committed_metadata;
+            application_status = ApplicationJump_Validate(
+                APPLICATION_START_ADDRESS, &application_vector);
+            application_valid = (uint8_t)(application_status ==
+                                          APPLICATION_VALIDATION_OK);
+
+            if ((metadata.state == (uint32_t)UPDATE_IDLE) &&
+                (application_valid != 0U))
+            {
+                BootManager_ShowStartupWindow();
+                ApplicationJump_Execute(&application_vector);
+            }
+        }
+
+        BootManager_ShowFatalPulses(INSTALL_ERROR_PULSES);
+    }
 
     if (BootManager_ActionCanJump(decision.action) != 0U)
     {
