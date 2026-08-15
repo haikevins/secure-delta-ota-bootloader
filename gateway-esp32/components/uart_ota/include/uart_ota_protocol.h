@@ -152,9 +152,11 @@ bool UartOta_ParseHello(const UartOtaPacket_t *packet,
                         UartOtaHelloInfo_t *info);
 
 void UartOta_BuildStartPayload(uint8_t payload[UART_OTA_START_PAYLOAD_SIZE],
+                               uint8_t artifact_type,
                                uint32_t base_version,
                                uint32_t target_version,
                                uint32_t artifact_size,
-                               uint32_t artifact_crc32);
+                               uint32_t artifact_crc32,
+                               uint32_t container_header_size);
 
 #endif

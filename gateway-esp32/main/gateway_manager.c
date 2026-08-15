@@ -17,7 +17,7 @@
 #include "uart_ota.h"
 #include "wifi_station.h"
 
-#define STM32_APPLICATION_MAX_SIZE (38UL * 1024UL)
+#define STM32_INCOMING_ARTIFACT_MAX_SIZE (128UL * 1024UL)
 
 static const char *TAG = "gateway";
 
@@ -248,7 +248,7 @@ static esp_err_t ProcessCommand(
     download_config.use_crt_bundle = !config->use_test_ca;
     download_config.update_id = command->update_id;
     download_config.target_version = command->target_version;
-    download_config.max_image_size = STM32_APPLICATION_MAX_SIZE;
+    download_config.max_image_size = STM32_INCOMING_ARTIFACT_MAX_SIZE;
     download_config.timeout_ms = config->https_timeout_ms;
     download_config.progress = DownloadProgress;
     download_config.progress_context = &https_progress;
@@ -424,6 +424,12 @@ esp_err_t GatewayManager_RunPhase11(void)
         }
         ESP_LOGI(TAG, "P11_TIME=PASS mode=sntp");
     }
+
+    ESP_LOGI(
+        TAG,
+        "P15_RUNTIME_MQTT_URI=%s test_ca=%u",
+        config.mqtt_uri,
+        config.use_test_ca ? 1U : 0U);
 
     memset(&mqtt_config, 0, sizeof(mqtt_config));
     mqtt_config.broker_uri = config.mqtt_uri;

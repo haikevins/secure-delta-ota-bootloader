@@ -66,3 +66,4 @@ Packaging:
   Empty PHASE14_KEY_ID Makefile environment regression: PASS
   Invalid PHASE14_KEY_ID diagnostic regression: PASS
   Physical HIL re-test after key-id fix: PENDING
+Physical Phase 14 HIL: PASS (signed delta/full, unsigned/tampered/downgrade rejection)

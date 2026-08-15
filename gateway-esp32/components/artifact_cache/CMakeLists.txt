@@ -5,6 +5,7 @@ idf_component_register(
         "include"
     REQUIRES
         uart_ota
+        secure_container_meta
     PRIV_REQUIRES
         esp_partition
 )

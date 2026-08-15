@@ -83,7 +83,7 @@ No private key is intended to be stored in the repository or ZIP.
 signed delta, unsigned rejection, bad-signature rejection, signed full update,
 downgrade rejection and ST-Link byte comparison.
 
-Physical Phase-14 HIL remains pending until the user runs that target.
+Physical Phase-14 HIL: PASS on STM32F103 hardware.
 
 ## Production boundary
 
@@ -112,7 +112,7 @@ passed on the host. The temporary signing private key was kept outside the
 repository tree and the trust-anchor source was restored to the unprovisioned
 placeholder after validation.
 
-Physical Phase-14 HIL remains pending until run on the user's STM32 board.
+Physical Phase-14 HIL: PASS. Signed delta, unsigned rejection, tampered-signature rejection, signed full update, byte-for-byte verification and downgrade rejection all passed.
 
 ## HIL empty `PHASE14_KEY_ID` fix
 
@@ -142,3 +142,21 @@ which raises `ValueError` for valid outputs outside the repository.
 The merge tool now prints a repository-relative path when possible and falls
 back to the resolved absolute path otherwise. The same behavior is used for
 the sidecar manifest.
+
+
+## Final physical HIL result
+
+Phase 14 was physically verified before Phase 15 began.
+
+```text
+P14_BASELINE=PASS app=v1 caps=0x0000001F
+P14_SECURE_DELTA=PASS target=v2
+P14_UNSIGNED_REJECT=PASS status=SIGNATURE_ERROR
+P14_SIGNATURE_REJECT=PASS tampered_signature_preserved_v2
+P14_SECURE_FULL=PASS target=v3
+P14_DOWNGRADE_REJECT=PASS status=VERSION_REJECTED
+Phase 14 secure container hardware test: PASS
+```
+
+Final STM32 metadata was `IDLE`, active version `v3`, no pending update, no trial
+attempts and `last_error=0`.

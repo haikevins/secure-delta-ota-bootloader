@@ -21,9 +21,12 @@ typedef void (*UartOtaProgressFn)(void *context,
 typedef struct
 {
     uint32_t update_id;
+    uint32_t base_version;
     uint32_t target_version;
     uint32_t image_size;
     uint32_t image_crc32;
+    uint32_t container_header_size;
+    uint8_t artifact_type;
     UartOtaArtifactReadFn read;
     void *read_context;
 } UartOtaArtifact_t;

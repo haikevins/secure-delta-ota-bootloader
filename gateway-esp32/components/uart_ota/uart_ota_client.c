@@ -12,7 +12,7 @@
 
 #define UART_OTA_RX_BUFFER_SIZE      1024
 #define UART_OTA_CONNECT_TIMEOUT_MS  12000UL
-#define UART_OTA_FINAL_TIMEOUT_MS    55000UL
+#define UART_OTA_FINAL_TIMEOUT_MS    120000UL
 #define UART_OTA_POLL_DELAY_MS       250UL
 
 static const char *TAG = "uart_ota";
@@ -375,8 +375,7 @@ static esp_err_t AbortTransfer(UartOtaClient_t *client,
 }
 
 static esp_err_t StartTransfer(UartOtaClient_t *client,
-                               const UartOtaArtifact_t *artifact,
-                               uint32_t base_version)
+                               const UartOtaArtifact_t *artifact)
 {
     UartOtaPacket_t request;
     UartOtaPacket_t response;
@@ -391,10 +390,12 @@ static esp_err_t StartTransfer(UartOtaClient_t *client,
     request.payload_length = UART_OTA_START_PAYLOAD_SIZE;
 
     UartOta_BuildStartPayload(request.payload,
-                              base_version,
+                              artifact->artifact_type,
+                              artifact->base_version,
                               artifact->target_version,
                               artifact->image_size,
-                              artifact->image_crc32);
+                              artifact->image_crc32,
+                              artifact->container_header_size);
 
     status = Request(client, &request, &response);
     if (status != ESP_OK)
@@ -593,6 +594,10 @@ static esp_err_t WaitForFinal(UartOtaClient_t *client,
     const int64_t deadline = DeadlineUs(UART_OTA_FINAL_TIMEOUT_MS);
     bool saw_trial = false;
 
+    ESP_LOGI(TAG,
+             "waiting for STM32 final state timeout=%lu ms",
+             (unsigned long)UART_OTA_FINAL_TIMEOUT_MS);
+
     while (!DeadlineExpired(deadline))
     {
         UartOtaHelloInfo_t info;
@@ -660,13 +665,14 @@ esp_err_t UartOta_TransferInstallAndWait(UartOtaClient_t *client,
     UartOtaPlan_t plan;
     esp_err_t status;
     uint32_t start_offset = 0UL;
-    uint32_t base_version = 0UL;
 
     if ((client == NULL) || (artifact == NULL) ||
         (artifact->read == NULL) ||
         (artifact->update_id == 0UL) ||
         (artifact->target_version == 0UL) ||
-        (artifact->image_size == 0UL))
+        (artifact->image_size == 0UL) ||
+        ((artifact->artifact_type != 1U) &&
+         (artifact->artifact_type != 2U)))
     {
         return ESP_ERR_INVALID_ARG;
     }
@@ -690,7 +696,29 @@ esp_err_t UartOta_TransferInstallAndWait(UartOtaClient_t *client,
         return ESP_ERR_NOT_SUPPORTED;
     }
 
-    base_version = target.application_version;
+    if (artifact->artifact_type == 2U)
+    {
+        if ((target.capability_flags & UART_OTA_CAP_DELTA_IMAGE) == 0UL)
+        {
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+        if (artifact->base_version != target.application_version)
+        {
+            return ESP_ERR_INVALID_VERSION;
+        }
+    }
+    else if (artifact->artifact_type != 1U)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (artifact->container_header_size == 140UL)
+    {
+        if ((target.capability_flags & UART_OTA_CAP_SIGNATURE_VERIFY) == 0UL)
+        {
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+    }
 
     for (uint32_t transitions = 0UL; transitions < 4UL; ++transitions)
     {
@@ -722,7 +750,7 @@ esp_err_t UartOta_TransferInstallAndWait(UartOtaClient_t *client,
                 continue;
 
             case UART_OTA_PLAN_START_NEW:
-                status = StartTransfer(client, artifact, base_version);
+                status = StartTransfer(client, artifact);
                 if (status != ESP_OK)
                 {
                     return status;

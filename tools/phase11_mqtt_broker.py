@@ -141,6 +141,12 @@ def main() -> int:
     parser.add_argument("--topic-base", default="sdota")
     parser.add_argument("--device-id", default="bluepill-001")
     parser.add_argument("--command-file", type=Path, required=True)
+    parser.add_argument(
+        "--idle-timeout",
+        type=float,
+        default=45.0,
+        help="TLS MQTT connection idle timeout in seconds",
+    )
     args = parser.parse_args()
 
     command_topic = f"{args.topic_base}/{args.device_id}/command"
@@ -182,7 +188,7 @@ def main() -> int:
                 raw_conn,
                 server_side=True,
             ) as conn:
-                conn.settimeout(45.0)
+                conn.settimeout(args.idle_timeout)
                 print(
                     f"P11_BROKER_TLS=PASS peer={peer[0]}:{peer[1]}",
                     flush=True,

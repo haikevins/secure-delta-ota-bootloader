@@ -27,6 +27,7 @@
 .git/refs/heads/main
 .git/refs/remotes/origin/HEAD
 .github/workflows/build.yml
+.github/workflows/firmware-release.yml
 .github/workflows/release.yml
 .github/workflows/test.yml
 .gitignore
@@ -43,6 +44,8 @@ PHASE13_REPORT.md
 PHASE13_VALIDATION.txt
 PHASE14_REPORT.md
 PHASE14_VALIDATION.txt
+PHASE15_REPORT.md
+PHASE15_VALIDATION.txt
 PHASE1_REPORT.md
 PHASE2_REPORT.md
 PHASE3_REPORT.md
@@ -112,6 +115,8 @@ docs/phase-13-checklist.md
 docs/phase-13-stm32-delta.md
 docs/phase-14-checklist.md
 docs/phase-14-secure-container.md
+docs/phase-15-checklist.md
+docs/phase-15-server-release-pipeline.md
 docs/phase-2-checklist.md
 docs/phase-3-checklist.md
 docs/phase-4-checklist.md
@@ -151,6 +156,9 @@ gateway-esp32/components/mqtt_orchestrator/include/mqtt_orchestrator.h
 gateway-esp32/components/mqtt_orchestrator/mqtt_orchestration_contract.c
 gateway-esp32/components/mqtt_orchestrator/mqtt_orchestrator.c
 gateway-esp32/components/mqtt_service/README.md
+gateway-esp32/components/secure_container_meta/CMakeLists.txt
+gateway-esp32/components/secure_container_meta/include/secure_container_meta.h
+gateway-esp32/components/secure_container_meta/secure_container_meta.c
 gateway-esp32/components/storage/README.md
 gateway-esp32/components/telemetry/README.md
 gateway-esp32/components/time_sync/CMakeLists.txt
@@ -475,6 +483,8 @@ scripts/phase13_check.py
 scripts/phase13_hw_test.py
 scripts/phase14_check.py
 scripts/phase14_hw_test.py
+scripts/phase15_check.py
+scripts/phase15_hw_test.py
 scripts/phase1_check.py
 scripts/phase2_check.py
 scripts/phase3_check.py
@@ -493,17 +503,25 @@ scripts/phase9_hw_test.py
 scripts/phase9_prepare_gateway.py
 scripts/run_tests.sh
 server/README.md
+server/__init__.py
+server/app/__init__.py
 server/app/api/.gitkeep
 server/app/main.py
 server/app/models/.gitkeep
+server/app/models/__init__.py
+server/app/models/release.py
+server/app/models/sdot.py
 server/app/schemas/.gitkeep
+server/app/services/__init__.py
 server/app/services/firmware_service.py
+server/app/services/https_service.py
 server/app/services/manifest_service.py
 server/app/services/mqtt_service.py
 server/app/services/signing_service.py
 server/app/storage/.gitkeep
 server/requirements.txt
 server/schemas/phase12-delta-manifest.schema.json
+server/schemas/phase15-release-manifest.schema.json
 server/tests/.gitkeep
 shared/include/backup_image.h
 shared/include/backup_progress.h
@@ -543,6 +561,7 @@ tests/host/test_phase14_container.c
 tests/host/test_phase14_crypto.c
 tests/host/test_phase14_secure_janpatch.c
 tests/host/test_phase14_secure_verifier.c
+tests/host/test_phase15_gateway_contract.c
 tests/integration/.gitkeep
 tests/protocol-vectors/.gitkeep
 tests/protocol-vectors/phase5_vectors.json
@@ -586,6 +605,7 @@ tools/phase12_delta.py
 tools/phase13_delta_artifact.py
 tools/phase14_keytool.py
 tools/phase14_secure_container.py
+tools/phase15_release.py
 tools/power_cut_test.py
 tools/requirements-phase5.txt
 tools/sign_container.py

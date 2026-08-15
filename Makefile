@@ -10,11 +10,12 @@ TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
         phase12-check phase12-base phase12-target phase12-delta \
         phase13-check phase13-base phase13-target phase13-delta phase13-baseline phase13-hw-test \
         phase14-check phase14-v1 phase14-v2 phase14-v3 phase14-hw-test \
+        phase15-check phase15-hw-test phase15-gateway-build phase15-release \
         bootloader application firmware combined \
         flash-bootloader flash-application flash-combined dump-metadata erase-metadata \
         gateway tools test release clean toolchain-info
 
-all: phase14-check
+all: phase15-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -298,6 +299,35 @@ phase14-hw-test:
 		$(TOOLCHAIN_ARG) python3 scripts/phase14_hw_test.py
 
 
+phase15-check: phase14-check
+	@$(TOOLCHAIN_ARG) python3 scripts/phase15_check.py
+
+phase15-gateway-build:
+	@command -v idf.py >/dev/null 2>&1 || { echo "idf.py not found. Source ESP-IDF export.sh first."; exit 1; }
+	@python3 scripts/esp32_build_guard.py
+	@cd gateway-esp32 && idf.py build
+
+phase15-hw-test:
+	@ESP32_PORT="$(ESP32_PORT)" PORT="$(PORT)" \
+		WIFI_SSID="$(WIFI_SSID)" WIFI_PASSWORD="$(WIFI_PASSWORD)" \
+		PHASE15_HOST_IP="$(PHASE15_HOST_IP)" \
+		HTTPS_PORT="$(HTTPS_PORT)" MQTT_PORT="$(MQTT_PORT)" \
+		PHASE15_KEY_ID="$(PHASE15_KEY_ID)" \
+		$(TOOLCHAIN_ARG) python3 scripts/phase15_hw_test.py
+
+phase15-release:
+	@python3 tools/phase15_release.py \
+		--target "$(TARGET)" \
+		--target-version "$(TARGET_VERSION)" \
+		$(if $(strip $(BASE)),--base "$(BASE)" --base-version "$(BASE_VERSION)",) \
+		--key "$(SIGNING_KEY)" \
+		--key-id "$(KEY_ID)" \
+		--base-url "$(BASE_URL)" \
+		--channel "$(if $(strip $(CHANNEL)),$(CHANNEL),stable)" \
+		--output-root "$(if $(strip $(RELEASE_ROOT)),$(RELEASE_ROOT),dist/releases)"
+
+
+
 firmware: bootloader application
 
 bootloader:
@@ -334,10 +364,10 @@ gateway: phase11-gateway-build
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase14-check
+test: phase15-check
 
 release:
-	@echo "Signed release pipeline is Phase 15."
+	@echo "Use make phase15-release TARGET=... TARGET_VERSION=... SIGNING_KEY=/secure/path/key.pem KEY_ID=0x... BASE_URL=https://firmware.example"
 
 clean:
 	@$(MAKE) -C node-stm32f103/bootloader clean
@@ -376,6 +406,14 @@ clean:
 	@rm -rf node-stm32f103/application/out-phase14-hw-v2
 	@rm -rf node-stm32f103/application/build-phase14-hw-v3
 	@rm -rf node-stm32f103/application/out-phase14-hw-v3
+	@rm -rf node-stm32f103/application/build-phase15-base
+	@rm -rf node-stm32f103/application/out-phase15-base
+	@rm -rf node-stm32f103/application/build-phase15-target
+	@rm -rf node-stm32f103/application/out-phase15-target
+	@rm -rf node-stm32f103/application/build-phase15-hw-v1
+	@rm -rf node-stm32f103/application/out-phase15-hw-v1
+	@rm -rf node-stm32f103/application/build-phase15-hw-v2
+	@rm -rf node-stm32f103/application/out-phase15-hw-v2
 	@rm -rf node-stm32f103/bootloader/build-phase7-fault
 	@rm -rf node-stm32f103/bootloader/out-phase7-fault
 	@rm -rf gateway-esp32/build gateway-esp32/sdkconfig dist build-host

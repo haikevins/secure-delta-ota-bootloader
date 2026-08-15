@@ -1,0 +1,198 @@
+name: Firmware Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_version:
+        description: "Unsigned STM32 application version to build (uint32 decimal)"
+        required: true
+        type: string
+      base_version:
+        description: "Previous published firmware version for delta, or 0 for full-only"
+        required: true
+        default: "0"
+        type: string
+      channel:
+        description: "Release channel"
+        required: true
+        default: stable
+        type: choice
+        options:
+          - stable
+          - beta
+          - dev
+      release_notes:
+        description: "Short release note line"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install host and STM32 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi openssl
+      - name: Phase 15 validation without production secret
+        run: make phase15-check TOOLCHAIN=gcc
+
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: firmware-production
+    concurrency:
+      group: firmware-production
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      TARGET_VERSION: ${{ inputs.target_version }}
+      BASE_VERSION: ${{ inputs.base_version }}
+      CHANNEL: ${{ inputs.channel }}
+      PHASE15_BASE_URL: ${{ vars.PHASE15_BASE_URL }}
+      PHASE15_KEY_ID: ${{ vars.PHASE15_KEY_ID }}
+      PHASE15_TRUSTED_KEY_SHA256: ${{ vars.PHASE15_TRUSTED_KEY_SHA256 }}
+      PHASE15_SIGNING_KEY_PEM: ${{ secrets.PHASE15_SIGNING_KEY_PEM }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install STM32 toolchain and OpenSSL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi openssl
+
+      - name: Validate protected release configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PHASE15_BASE_URL"
+          case "$PHASE15_BASE_URL" in
+            https://*) ;;
+            *) echo "PHASE15_BASE_URL must use https://" >&2; exit 1 ;;
+          esac
+          test -n "$PHASE15_KEY_ID"
+          test -n "$PHASE15_TRUSTED_KEY_SHA256"
+          test -n "$PHASE15_SIGNING_KEY_PEM"
+          python3 - <<'PY'
+          import os
+          for name in ("TARGET_VERSION", "BASE_VERSION"):
+              value = int(os.environ[name], 10)
+              if not 0 <= value <= 0xFFFFFFFF:
+                  raise SystemExit(f"{name} outside uint32")
+          target = int(os.environ["TARGET_VERSION"], 10)
+          base = int(os.environ["BASE_VERSION"], 10)
+          if target <= 0:
+              raise SystemExit("TARGET_VERSION must be positive")
+          if base and target <= base:
+              raise SystemExit("TARGET_VERSION must be newer than BASE_VERSION")
+          int(os.environ["PHASE15_KEY_ID"], 0)
+          fingerprint = os.environ["PHASE15_TRUSTED_KEY_SHA256"].strip().lower()
+          if len(fingerprint) != 64 or any(c not in "0123456789abcdef" for c in fingerprint):
+              raise SystemExit("PHASE15_TRUSTED_KEY_SHA256 must be 64 lowercase hex chars")
+          PY
+
+      - name: Materialize signing key only in runner temp
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          KEY="$RUNNER_TEMP/phase15-signing-private.pem"
+          printf '%s\n' "$PHASE15_SIGNING_KEY_PEM" > "$KEY"
+          chmod 600 "$KEY"
+          echo "PHASE15_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+
+      - name: Build target application
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C node-stm32f103/application \
+            TOOLCHAIN=gcc \
+            BUILD_DIR=build-phase15-release \
+            OUT_DIR=out-phase15-release \
+            PROJECT_CFLAGS="-DAPPLICATION_VERSION=${TARGET_VERSION}UL" \
+            clean all
+          echo "PHASE15_TARGET_BIN=$GITHUB_WORKSPACE/node-stm32f103/application/out-phase15-release/application.bin" >> "$GITHUB_ENV"
+
+      - name: Retrieve exact previous release base
+        if: ${{ inputs.base_version != '0' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/phase15-base"
+          gh release download "fw-v${BASE_VERSION}" \
+            --pattern "application-v${BASE_VERSION}.bin" \
+            --dir "$RUNNER_TEMP/phase15-base"
+          BASE="$RUNNER_TEMP/phase15-base/application-v${BASE_VERSION}.bin"
+          test -f "$BASE"
+          echo "PHASE15_BASE_BIN=$BASE" >> "$GITHUB_ENV"
+
+      - name: Create signed immutable release directory
+        shell: bash
+        env:
+          RELEASE_NOTE_LINE: ${{ inputs.release_notes }}
+        run: |
+          set -euo pipefail
+          RELEASE_ID="fw-v${TARGET_VERSION}"
+          NOTES="$RUNNER_TEMP/phase15-release-notes.md"
+          {
+            echo "# Firmware ${RELEASE_ID}"
+            echo
+            echo "- Channel: \`${CHANNEL}\`"
+            echo "- Target version: \`v${TARGET_VERSION}\`"
+            if [ -n "$RELEASE_NOTE_LINE" ]; then
+              echo "- ${RELEASE_NOTE_LINE}"
+            fi
+          } > "$NOTES"
+
+          args=(
+            python3 tools/phase15_release.py
+            --target "$PHASE15_TARGET_BIN"
+            --target-version "$TARGET_VERSION"
+            --key "$PHASE15_KEY_PATH"
+            --key-id "$PHASE15_KEY_ID"
+            --base-url "$PHASE15_BASE_URL"
+            --channel "$CHANNEL"
+            --release-id "$RELEASE_ID"
+            --output-root dist/releases
+            --notes "$NOTES"
+            --source-revision "$GITHUB_SHA"
+          )
+
+          if [ "$BASE_VERSION" != "0" ]; then
+            args+=(--base "$PHASE15_BASE_BIN" --base-version "$BASE_VERSION")
+          fi
+
+          "${args[@]}"
+          python3 server/app/main.py verify \
+            --release-root dist/releases \
+            --release-id "$RELEASE_ID"
+
+      - name: Publish GitHub release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_ID="fw-v${TARGET_VERSION}"
+          RELEASE_DIR="dist/releases/${RELEASE_ID}"
+
+          if gh release view "$RELEASE_ID" >/dev/null 2>&1; then
+            echo "GitHub release ${RELEASE_ID} already exists; refusing overwrite." >&2
+            exit 1
+          fi
+
+          gh release create "$RELEASE_ID" \
+            "$RELEASE_DIR"/* \
+            --target "$GITHUB_SHA" \
+            --title "Firmware ${RELEASE_ID}" \
+            --notes-file "$RELEASE_DIR/release-notes.md"
+
+      - name: Remove signing key
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f "${PHASE15_KEY_PATH:-}"

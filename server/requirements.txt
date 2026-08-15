@@ -1,1 +1,2 @@
-# Phase 15 dependencies will be pinned here.
+# Phase 15 server uses the Python 3 standard library only.
+# Runtime tools: OpenSSL CLI for manifest-signature verification.

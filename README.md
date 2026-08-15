@@ -21,7 +21,8 @@ STM32 uses **Standard Peripheral Library + CMSIS**, not HAL. ESP32 uses
 - Phase 11 — MQTT orchestration: complete + hardware verified.
 - Phase 12 — Delta patch generation: complete + host verified.
 - Phase 13 — STM32 delta patching: complete + hardware verified.
-- Phase 14 — Secure container/signature: implemented + host/build/security verified; physical HIL pending.
+- Phase 14 — Secure container/signature: complete + hardware verified.
+- Phase 15 — Server and release pipeline: implemented + host/server/security validation; physical end-to-end HIL pending.
 
 ## Phase 11 pipeline
 
@@ -202,3 +203,60 @@ See:
 - `docs/phase-14-secure-container.md`
 - `docs/phase-14-checklist.md`
 - `PHASE14_REPORT.md`
+
+
+## Phase 15 server and release pipeline
+
+Phase 15 creates immutable signed releases, verifies them before publication,
+pins the authorized release-key fingerprint on server/publisher operations,
+serves artifacts over HTTPS, publishes Phase-11-compatible commands over MQTTS
+QoS1, and upgrades the ESP32 gateway to extract Phase-14 SDOT metadata for the
+UART START packet.
+
+Host/server validation:
+
+```bash
+make phase15-check
+```
+
+Create a local release:
+
+```bash
+make phase15-release \
+  TARGET=/path/to/application-v3.bin \
+  TARGET_VERSION=3 \
+  BASE=/path/to/application-v2.bin \
+  BASE_VERSION=2 \
+  SIGNING_KEY=/secure/location/firmware-signing.pem \
+  KEY_ID=0x14000001 \
+  BASE_URL=https://firmware.example
+```
+
+Physical end-to-end HIL:
+
+```bash
+source ~/esp/esp-idf/export.sh
+export STM32_OPENOCD=/usr/bin/openocd
+export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+
+make phase15-hw-test \
+  ESP32_PORT=/dev/ttyUSB0 \
+  WIFI_SSID="your-ssid" \
+  WIFI_PASSWORD="your-password" \
+  PHASE15_HOST_IP=<PC_LAN_IP>
+```
+
+Wiring is the normal ESP32 gateway wiring:
+
+```text
+ESP32 GPIO17 TX -> STM32 PA10 RX
+ESP32 GPIO16 RX <- STM32 PA9 TX
+ESP32 GND       -> STM32 GND
+ST-Link         -> STM32 SWD
+```
+
+See:
+
+- `docs/phase-15-server-release-pipeline.md`
+- `docs/phase-15-checklist.md`
+- `PHASE15_REPORT.md`

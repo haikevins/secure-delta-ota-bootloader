@@ -1,0 +1,50 @@
+Secure Delta OTA Phase 15 validation
+
+Required host command:
+  make phase15-check
+
+Expected final marker:
+  Secure Delta OTA Phase 15 server/release pipeline check: PASS
+
+Direct Phase-15 host/server/security checker executed in packaging environment:
+  Python syntax: PASS
+  ESP32 secure-container -> UART START host C contract: PASS
+  Immutable signed release generation: PASS
+  Exact-base delta selection / full fallback: PASS
+  Delta final signed-container savings: 89.77%
+  Reference signed delta: 1174 bytes
+  Reference signed full: 11480 bytes
+  Release private-key custody policy: PASS
+  Pinned release-key authorization: PASS
+  Detached manifest signature + artifact verification: PASS
+  TLS HTTPS byte-for-byte release serving: PASS
+  MQTTS QoS1 publish + PUBACK: PASS
+  Tampered release rejection: PASS
+  Final marker: Secure Delta OTA Phase 15 server/release pipeline check: PASS
+
+Notes:
+  The packaging environment imposes a short per-execution limit, so the
+  aggregate `make phase15-check` (which first reruns the complete Phase-14
+  checker) could not be observed to completion here. The Phase-15 checker was
+  run directly to PASS. Phase 14 was already independently hardware verified
+  before Phase 15.
+
+Physical HIL:
+  source ~/esp/esp-idf/export.sh
+  export STM32_OPENOCD=/usr/bin/openocd
+  export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+  make phase15-hw-test \
+    ESP32_PORT=/dev/ttyUSB0 \
+    WIFI_SSID="..." \
+    WIFI_PASSWORD="..." \
+    PHASE15_HOST_IP=<PC_LAN_IP>
+
+Status at packaging:
+  IMPLEMENTED + HOST/SERVER/SECURITY VERIFIED.
+  Physical Phase-15 ESP32 + STM32 HIL pending user hardware.
+  MQTT URI source/binary/runtime diagnostic guard: PASS
+  Physical HIL network re-test: PENDING
+  Secure-install wait regression guard: PASS (STM32 final 120s; HIL MQTT idle 150s)
+  Physical HIL re-test after secure-wait fix: PENDING
+  Wi-Fi power-save reliability guard: PASS (WIFI_PS_NONE)
+  Physical HIL re-test after Wi-Fi reliability fix: PENDING

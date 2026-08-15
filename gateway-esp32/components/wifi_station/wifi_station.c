@@ -195,7 +195,48 @@ esp_err_t WifiStation_Connect(const char *ssid,
 
     if ((bits & WIFI_CONNECTED_BIT) != 0U)
     {
+        wifi_ps_type_t power_save = WIFI_PS_MIN_MODEM;
+
+        /*
+         * The OTA gateway is latency/reliability sensitive while carrying
+         * MQTTS + HTTPS traffic.  ESP-IDF defaults to WIFI_PS_MIN_MODEM;
+         * disable modem power-save after GOT_IP so ARP/TCP/TLS startup is
+         * not dependent on inbound traffic keeping the station awake.
+         */
+        status = esp_wifi_set_ps(WIFI_PS_NONE);
+        if (status != ESP_OK)
+        {
+            ESP_LOGE(TAG,
+                     "failed to disable Wi-Fi power save: %s",
+                     esp_err_to_name(status));
+            return status;
+        }
+
+        status = esp_wifi_get_ps(&power_save);
+        if (status != ESP_OK)
+        {
+            ESP_LOGE(TAG,
+                     "failed to read Wi-Fi power-save mode: %s",
+                     esp_err_to_name(status));
+            return status;
+        }
+
+        if (power_save != WIFI_PS_NONE)
+        {
+            ESP_LOGE(TAG,
+                     "Wi-Fi power-save mode verification failed: %d",
+                     (int)power_save);
+            return ESP_FAIL;
+        }
+
+        ESP_LOGI(TAG, "P15_WIFI_PS=PASS mode=none");
         ESP_LOGI(TAG, "Wi-Fi connected to SSID '%s'", ssid);
+
+        /*
+         * Give the netif/AP a short settling interval after changing the
+         * power-save policy before starting the first TLS socket.
+         */
+        vTaskDelay(pdMS_TO_TICKS(250U));
         return ESP_OK;
     }
 

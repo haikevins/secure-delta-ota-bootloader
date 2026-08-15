@@ -1,4 +1,5 @@
 #include "artifact_cache.h"
+#include "secure_container_meta.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -453,17 +454,61 @@ esp_err_t ArtifactCache_Read(void *context,
 esp_err_t ArtifactCache_AsUartArtifact(ArtifactCache_t *cache,
                                       UartOtaArtifact_t *artifact)
 {
+    uint8_t prefix[SECURE_CONTAINER_META_HEADER_SIZE];
+    SecureContainerMeta_t secure;
+
     if ((cache == NULL) || (artifact == NULL) ||
         (cache->partition == NULL))
     {
         return ESP_ERR_INVALID_ARG;
     }
 
+    memset(artifact, 0, sizeof(*artifact));
     artifact->update_id = cache->header.update_id;
     artifact->target_version = cache->header.target_version;
     artifact->image_size = cache->header.image_size;
     artifact->image_crc32 = cache->header.image_crc32;
+    artifact->artifact_type = 1U; /* legacy full-image default */
     artifact->read = ArtifactCache_Read;
     artifact->read_context = cache;
+
+    if (cache->header.image_size >= 4UL)
+    {
+        size_t read_length = cache->header.image_size;
+        if (read_length > sizeof(prefix))
+        {
+            read_length = sizeof(prefix);
+        }
+
+        if (ArtifactCache_Read(
+                cache, 0UL, prefix, read_length) != ESP_OK)
+        {
+            return ESP_FAIL;
+        }
+
+        if (SecureContainerMeta_HasMagic(prefix, read_length))
+        {
+            if (!SecureContainerMeta_Parse(
+                    prefix,
+                    read_length,
+                    cache->header.image_size,
+                    &secure))
+            {
+                return ESP_ERR_INVALID_RESPONSE;
+            }
+
+            if (secure.target_version != cache->header.target_version)
+            {
+                return ESP_ERR_INVALID_VERSION;
+            }
+
+            artifact->artifact_type = secure.image_type;
+            artifact->base_version = secure.base_version;
+            artifact->target_version = secure.target_version;
+            artifact->container_header_size =
+                SECURE_CONTAINER_META_HEADER_SIZE;
+        }
+    }
+
     return ESP_OK;
 }

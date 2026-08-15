@@ -395,18 +395,20 @@ bool UartOta_ParseHello(const UartOtaPacket_t *packet,
 }
 
 void UartOta_BuildStartPayload(uint8_t payload[UART_OTA_START_PAYLOAD_SIZE],
+                               uint8_t artifact_type,
                                uint32_t base_version,
                                uint32_t target_version,
                                uint32_t artifact_size,
-                               uint32_t artifact_crc32)
+                               uint32_t artifact_crc32,
+                               uint32_t container_header_size)
 {
     memset(payload, 0, UART_OTA_START_PAYLOAD_SIZE);
-    payload[0] = 1U; /* FW_IMAGE_FULL */
+    payload[0] = artifact_type;
     payload[1] = 0U;
     PutU16Le(&payload[2], 1U); /* container-format version */
     PutU32Le(&payload[4], base_version);
     PutU32Le(&payload[8], target_version);
     PutU32Le(&payload[12], artifact_size);
     PutU32Le(&payload[16], artifact_crc32);
-    PutU32Le(&payload[20], 0UL); /* raw app image, no container header yet */
+    PutU32Le(&payload[20], container_header_size);
 }

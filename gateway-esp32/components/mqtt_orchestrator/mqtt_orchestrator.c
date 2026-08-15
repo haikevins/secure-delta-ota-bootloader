@@ -130,7 +130,7 @@ static esp_err_t ParseCommandJson(const char *payload,
 
     contract = MqttOrchestration_ValidateCommand(
         command,
-        38UL * 1024UL);
+        128UL * 1024UL);
     if (contract != MQTT_ORCH_CONTRACT_OK)
     {
         ESP_LOGW(TAG,
