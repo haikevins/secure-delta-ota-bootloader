@@ -2,6 +2,8 @@
 
 #include "boot_metadata.h"
 #include "crc32.h"
+#include "download_checkpoint.h"
+#include "download_checkpoint_storage.h"
 #include "external_flash_storage.h"
 #include "firmware_container.h"
 #include "full_image_validation.h"
@@ -9,6 +11,7 @@
 #include "metadata_storage.h"
 #include "ota_status.h"
 #include "spi_flash.h"
+#include "trial_confirmation.h"
 #include "update_handoff.h"
 #include "update_handoff_storage.h"
 
@@ -23,6 +26,7 @@ typedef struct
     uint32_t target_version;
     uint32_t expected_size;
     uint32_t next_offset;
+    uint32_t persisted_offset;
     uint32_t artifact_crc32;
     uint32_t last_error_detail;
     uint32_t erased_sector_bitmap;
@@ -54,6 +58,7 @@ static void ResetTransfer(void)
     g_session.target_version = 0UL;
     g_session.expected_size = 0UL;
     g_session.next_offset = 0UL;
+    g_session.persisted_offset = 0UL;
     g_session.artifact_crc32 = 0UL;
     g_session.erased_sector_bitmap = 0UL;
     g_session.expected_sequence = 0U;
@@ -62,6 +67,148 @@ static void ResetTransfer(void)
     g_session.last_data_offset = 0UL;
     g_session.last_data_sequence = 0U;
     g_session.last_data_length = 0U;
+}
+
+
+static uint32_t CheckpointErrorDetail(DownloadCheckpointStorageStatus_t status)
+{
+    return 0x00071000UL | (uint32_t)status;
+}
+
+static DownloadCheckpointStorageStatus_t PersistDownloadCheckpoint(
+    DownloadCheckpointState_t state,
+    uint32_t next_offset)
+{
+    DownloadCheckpointRecord_t requested;
+    DownloadCheckpointRecord_t committed;
+    DownloadCheckpointStorageStatus_t status;
+
+    DownloadCheckpoint_InitSession(&requested,
+                                   state,
+                                   g_session.update_id,
+                                   g_session.target_version,
+                                   g_session.expected_size,
+                                   g_session.artifact_crc32,
+                                   next_offset);
+
+    status = DownloadCheckpointStorage_Commit(
+        &requested,
+        &committed,
+        (DownloadCheckpointSlot_t *)0);
+
+    if (status == DOWNLOAD_CHECKPOINT_STORAGE_OK)
+    {
+        g_session.persisted_offset = committed.next_offset;
+    }
+
+    return status;
+}
+
+static DownloadCheckpointStorageStatus_t ClearDownloadCheckpoint(void)
+{
+    const DownloadCheckpointStorageStatus_t status =
+        DownloadCheckpointStorage_Clear();
+
+    if (status == DOWNLOAD_CHECKPOINT_STORAGE_OK)
+    {
+        g_session.persisted_offset = 0UL;
+    }
+
+    return status;
+}
+
+static uint32_t CompletedSectorBitmap(uint32_t checkpoint_offset)
+{
+    uint32_t bitmap = 0UL;
+    uint32_t sector;
+    const uint32_t complete_sectors =
+        checkpoint_offset / EXT_FLASH_SECTOR_SIZE;
+
+    for (sector = 0UL; sector < complete_sectors; ++sector)
+    {
+        bitmap |= (1UL << sector);
+    }
+
+    return bitmap;
+}
+
+
+static void MirrorPersistentTrialState(void)
+{
+    BootMetadata_t metadata;
+    const MetadataStorageStatus_t status =
+        MetadataStorage_Load(&metadata, (BootMetadataSlot_t *)0);
+
+    if ((status == METADATA_STORAGE_OK) &&
+        ((metadata.state == (uint32_t)UPDATE_TRIAL_BOOT) ||
+         (metadata.state == (uint32_t)UPDATE_CONFIRMED)))
+    {
+        g_session.state = (uint8_t)metadata.state;
+        g_session.update_id = metadata.active_update_id;
+        g_session.target_version = metadata.pending_version;
+        g_session.expected_size = metadata.expected_size;
+        g_session.next_offset = metadata.received_size;
+        g_session.persisted_offset = 0UL;
+        g_session.expected_sequence = 0U;
+        g_session.has_last_data = 0U;
+    }
+}
+
+static DownloadCheckpointStorageStatus_t RestoreDownloadCheckpoint(void)
+{
+    DownloadCheckpointRecord_t record;
+    DownloadCheckpointStorageStatus_t status;
+
+    status = DownloadCheckpointStorage_Load(
+        &record,
+        (DownloadCheckpointSlot_t *)0);
+
+    if (status == DOWNLOAD_CHECKPOINT_STORAGE_NOT_FOUND)
+    {
+        return DOWNLOAD_CHECKPOINT_STORAGE_OK;
+    }
+
+    if (status != DOWNLOAD_CHECKPOINT_STORAGE_OK)
+    {
+        return status;
+    }
+
+    if (record.state == (uint32_t)DOWNLOAD_CHECKPOINT_IDLE)
+    {
+        return DOWNLOAD_CHECKPOINT_STORAGE_OK;
+    }
+
+    g_session.state =
+        (record.state == (uint32_t)DOWNLOAD_CHECKPOINT_ARTIFACT_READY)
+            ? (uint8_t)UPDATE_ARTIFACT_READY
+            : (uint8_t)UPDATE_RECEIVING;
+    g_session.update_id = record.update_id;
+    g_session.target_version = record.target_version;
+    g_session.expected_size = record.image_size;
+    g_session.next_offset = record.next_offset;
+    g_session.persisted_offset = record.next_offset;
+    g_session.artifact_crc32 = record.image_crc32;
+    g_session.erased_sector_bitmap =
+        CompletedSectorBitmap(record.next_offset);
+    g_session.expected_sequence =
+        (uint16_t)((record.next_offset / OTA_MAX_PAYLOAD_SIZE) & 0xFFFFUL);
+    g_session.has_last_data = 0U;
+    g_session.reset_pending = 0U;
+
+    return DOWNLOAD_CHECKPOINT_STORAGE_OK;
+}
+
+static DownloadCheckpointStorageStatus_t PersistReceiveBoundaryIfNeeded(void)
+{
+    if ((g_session.next_offset == 0UL) ||
+        ((g_session.next_offset & (EXT_FLASH_SECTOR_SIZE - 1UL)) != 0UL) ||
+        (g_session.persisted_offset == g_session.next_offset))
+    {
+        return DOWNLOAD_CHECKPOINT_STORAGE_OK;
+    }
+
+    return PersistDownloadCheckpoint(DOWNLOAD_CHECKPOINT_RECEIVING,
+                                     g_session.next_offset);
 }
 
 void OtaReceiver_GetResponseInfo(OtaResponseInfo_t *info)
@@ -76,7 +223,7 @@ void OtaReceiver_GetResponseInfo(OtaResponseInfo_t *info)
     info->expected_size = g_session.expected_size;
     info->last_error_detail = g_session.last_error_detail;
     info->capability_flags = (g_session.storage_ready != 0U)
-                                 ? (OTA_CAP_FULL_IMAGE | OTA_CAP_RESUME)
+                                 ? (OTA_CAP_FULL_IMAGE | OTA_CAP_RESUME | OTA_CAP_ROLLBACK)
                                  : 0UL;
 }
 
@@ -245,6 +392,19 @@ static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
     g_session.expected_sequence = 0U;
     g_session.has_last_data = 0U;
     g_session.reset_pending = 0U;
+
+    {
+        const DownloadCheckpointStorageStatus_t checkpoint_status =
+            PersistDownloadCheckpoint(DOWNLOAD_CHECKPOINT_RECEIVING, 0UL);
+        if (checkpoint_status != DOWNLOAD_CHECKPOINT_STORAGE_OK)
+        {
+            ResetTransfer();
+            Nack(request, OTA_STATUS_STORAGE_ERROR,
+                 CheckpointErrorDetail(checkpoint_status), response);
+            return;
+        }
+    }
+
     Ack(request, response);
 }
 
@@ -274,7 +434,18 @@ static void ProcessData(const OtaPacket_t *request, OtaPacket_t *response)
     {
         if (StoredDataMatches(request))
         {
-            Ack(request, response);
+            const DownloadCheckpointStorageStatus_t checkpoint_status =
+                PersistReceiveBoundaryIfNeeded();
+
+            if (checkpoint_status != DOWNLOAD_CHECKPOINT_STORAGE_OK)
+            {
+                Nack(request, OTA_STATUS_STORAGE_ERROR,
+                     CheckpointErrorDetail(checkpoint_status), response);
+            }
+            else
+            {
+                Ack(request, response);
+            }
         }
         else
         {
@@ -330,6 +501,19 @@ static void ProcessData(const OtaPacket_t *request, OtaPacket_t *response)
     g_session.last_data_length = request->payload_length;
     g_session.next_offset += (uint32_t)request->payload_length;
     g_session.expected_sequence = (uint16_t)(g_session.expected_sequence + 1U);
+
+    {
+        const DownloadCheckpointStorageStatus_t checkpoint_status =
+            PersistReceiveBoundaryIfNeeded();
+
+        if (checkpoint_status != DOWNLOAD_CHECKPOINT_STORAGE_OK)
+        {
+            Nack(request, OTA_STATUS_STORAGE_ERROR,
+                 CheckpointErrorDetail(checkpoint_status), response);
+            return;
+        }
+    }
+
     Ack(request, response);
 }
 
@@ -380,6 +564,19 @@ static void ProcessFinish(const OtaPacket_t *request, OtaPacket_t *response)
         g_session.state = (uint8_t)UPDATE_FAILED;
         Nack(request, OTA_STATUS_CONTAINER_ERROR, artifact_crc, response);
         return;
+    }
+
+    {
+        const DownloadCheckpointStorageStatus_t checkpoint_status =
+            PersistDownloadCheckpoint(DOWNLOAD_CHECKPOINT_ARTIFACT_READY,
+                                      g_session.expected_size);
+
+        if (checkpoint_status != DOWNLOAD_CHECKPOINT_STORAGE_OK)
+        {
+            Nack(request, OTA_STATUS_STORAGE_ERROR,
+                 CheckpointErrorDetail(checkpoint_status), response);
+            return;
+        }
     }
 
     g_session.state = (uint8_t)UPDATE_ARTIFACT_READY;
@@ -512,8 +709,46 @@ static void ProcessInstall(const OtaPacket_t *request, OtaPacket_t *response)
     g_session.reset_pending = 1U;
 }
 
+
+static void ProcessConfirm(const OtaPacket_t *request, OtaPacket_t *response)
+{
+    uint32_t detail = 0UL;
+
+    if (request->payload_length != 0U)
+    {
+        Nack(request, OTA_STATUS_INVALID_PACKET, 0UL, response);
+        return;
+    }
+
+    if (g_session.state != (uint8_t)UPDATE_TRIAL_BOOT)
+    {
+        Nack(request, OTA_STATUS_INVALID_STATE, 0UL, response);
+        return;
+    }
+
+    if ((request->update_id != 0UL) &&
+        (request->update_id != g_session.update_id))
+    {
+        Nack(request, OTA_STATUS_UPDATE_ID_MISMATCH, 0UL, response);
+        return;
+    }
+
+    if (!TrialConfirmation_ConfirmNow(&detail))
+    {
+        Nack(request, OTA_STATUS_INTERNAL_ERROR, detail, response);
+        return;
+    }
+
+    g_session.state = (uint8_t)UPDATE_CONFIRMED;
+    Ack(request, response);
+    g_session.reset_pending = 1U;
+}
+
 bool OtaReceiver_Init(void)
 {
+    DownloadCheckpointStorageStatus_t checkpoint_status =
+        DOWNLOAD_CHECKPOINT_STORAGE_OK;
+
     g_session.storage_ready = ExternalFlashStorage_Init() ? 1U : 0U;
     g_session.last_status = (g_session.storage_ready != 0U)
                                 ? (uint8_t)OTA_STATUS_OK
@@ -521,7 +756,26 @@ bool OtaReceiver_Init(void)
     g_session.last_error_detail = (g_session.storage_ready != 0U)
                                       ? 0UL
                                       : (uint32_t)SpiFlash_GetLastStatus();
+
     ResetTransfer();
+
+    if (g_session.storage_ready != 0U)
+    {
+        checkpoint_status = RestoreDownloadCheckpoint();
+        if (checkpoint_status != DOWNLOAD_CHECKPOINT_STORAGE_OK)
+        {
+            g_session.storage_ready = 0U;
+            g_session.last_status = (uint8_t)OTA_STATUS_STORAGE_ERROR;
+            g_session.last_error_detail =
+                CheckpointErrorDetail(checkpoint_status);
+            ResetTransfer();
+        }
+        else if (g_session.state == (uint8_t)UPDATE_IDLE)
+        {
+            MirrorPersistentTrialState();
+        }
+    }
+
     return g_session.storage_ready != 0U;
 }
 
@@ -574,6 +828,17 @@ void OtaReceiver_ProcessPacket(const OtaPacket_t *request,
                 Nack(request, OTA_STATUS_INVALID_PACKET, 0UL, response);
                 return;
             }
+            {
+                const DownloadCheckpointStorageStatus_t checkpoint_status =
+                    ClearDownloadCheckpoint();
+
+                if (checkpoint_status != DOWNLOAD_CHECKPOINT_STORAGE_OK)
+                {
+                    Nack(request, OTA_STATUS_STORAGE_ERROR,
+                         CheckpointErrorDetail(checkpoint_status), response);
+                    return;
+                }
+            }
             ResetTransfer();
             Ack(request, response);
             return;
@@ -602,7 +867,7 @@ void OtaReceiver_ProcessPacket(const OtaPacket_t *request,
             return;
 
         case OTA_CMD_CONFIRM:
-            Nack(request, OTA_STATUS_INVALID_STATE, 0UL, response);
+            ProcessConfirm(request, response);
             return;
 
         case OTA_CMD_ACK:

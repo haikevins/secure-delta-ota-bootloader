@@ -43,25 +43,65 @@ static uint8_t BootMetadata_StateFieldsAreConsistent(
                              (metadata->pending_version != 0UL));
 
         case UPDATE_ARTIFACT_READY:
+            return (uint8_t)(BootMetadata_UpdatePayloadIsComplete(metadata) &&
+                             (metadata->copy_offset == 0UL));
+
         case UPDATE_VERIFYING_CONTAINER:
         case UPDATE_VERIFYING_BASE:
         case UPDATE_PATCHING:
         case UPDATE_IMAGE_READY:
-        case UPDATE_BACKING_UP:
-        case UPDATE_INSTALLING:
-        case UPDATE_VERIFYING_INSTALL:
             return BootMetadata_UpdatePayloadIsComplete(metadata);
 
+        case UPDATE_BACKING_UP:
+            return (uint8_t)(
+                BootMetadata_UpdatePayloadIsComplete(metadata) &&
+                (metadata->pending_version != 0UL) &&
+                (metadata->boot_attempts == 0UL) &&
+                (metadata->copy_offset <= APPLICATION_MAX_SIZE) &&
+                ((metadata->copy_offset == APPLICATION_MAX_SIZE) ||
+                 ((metadata->copy_offset &
+                   (EXT_FLASH_SECTOR_SIZE - 1UL)) == 0UL)));
+
+        case UPDATE_INSTALLING:
+            return (uint8_t)(
+                BootMetadata_UpdatePayloadIsComplete(metadata) &&
+                (metadata->copy_offset <= metadata->expected_size) &&
+                ((metadata->copy_offset == metadata->expected_size) ||
+                 ((metadata->copy_offset &
+                   (INTERNAL_FLASH_PAGE_SIZE - 1UL)) == 0UL)));
+
+        case UPDATE_VERIFYING_INSTALL:
+            return (uint8_t)(
+                BootMetadata_UpdatePayloadIsComplete(metadata) &&
+                (metadata->copy_offset == metadata->expected_size));
+
         case UPDATE_TRIAL_BOOT:
-            return (uint8_t)((metadata->pending_version != 0UL) &&
-                             (metadata->boot_attempts <=
-                              BOOT_METADATA_MAX_BOOT_ATTEMPTS));
+            return (uint8_t)(
+                BootMetadata_UpdatePayloadIsComplete(metadata) &&
+                (metadata->pending_version != 0UL) &&
+                (metadata->copy_offset == 0UL) &&
+                (metadata->boot_attempts <=
+                 BOOT_METADATA_MAX_BOOT_ATTEMPTS));
 
         case UPDATE_CONFIRMED:
-            return (uint8_t)(metadata->pending_version != 0UL);
+            return (uint8_t)(
+                BootMetadata_UpdatePayloadIsComplete(metadata) &&
+                (metadata->pending_version != 0UL) &&
+                (metadata->copy_offset == 0UL) &&
+                (metadata->boot_attempts > 0UL) &&
+                (metadata->boot_attempts <=
+                 BOOT_METADATA_MAX_BOOT_ATTEMPTS));
 
         case UPDATE_ROLLBACK:
-            return (uint8_t)(metadata->active_update_id != 0UL);
+            return (uint8_t)(
+                BootMetadata_UpdatePayloadIsComplete(metadata) &&
+                (metadata->pending_version != 0UL) &&
+                (metadata->boot_attempts <=
+                 BOOT_METADATA_MAX_BOOT_ATTEMPTS) &&
+                (metadata->copy_offset <= APPLICATION_MAX_SIZE) &&
+                ((metadata->copy_offset == APPLICATION_MAX_SIZE) ||
+                 ((metadata->copy_offset &
+                   (INTERNAL_FLASH_PAGE_SIZE - 1UL)) == 0UL)));
 
         case UPDATE_FAILED:
             return 1U;

@@ -1,0 +1,14 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "gateway_config.c"
+        "gateway_manager.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_REQUIRES
+        uart_ota
+        artifact_cache
+        esp_timer
+    EMBED_FILES
+        "phase9_candidate.bin"
+)

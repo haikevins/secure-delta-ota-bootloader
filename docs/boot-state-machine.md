@@ -1,6 +1,6 @@
 # Boot and Update State Machine
 
-Status: **Phase 6 basic full-image install actions implemented; later delta/rollback states remain planned**
+Status: **Phase 8 full-image trial boot and rollback implemented; delta/security states remain planned**
 
 ## 1. Update states
 
@@ -83,10 +83,7 @@ FAILED permits a new START after explicit cleanup.
 ```
 
 
-## Phase 6 implemented path
-
-For the current basic full-image updater, the implemented path is intentionally
-shorter than the final state diagram:
+## Phase 8 implemented full-image path
 
 ```text
 RECEIVING -> ARTIFACT_READY
@@ -97,15 +94,30 @@ RECEIVING -> ARTIFACT_READY
                  v
           [validate source]
                  |
+            BACKING_UP
+                 |
             INSTALLING
                  |
         VERIFYING_INSTALL
                  |
-               IDLE
+            TRIAL_BOOT
+            /       \
+      CONFIRMED    attempt limit /
+          |        invalid trial
+          v           |
+         IDLE      ROLLBACK
+                     |
+                     v
+                    IDLE
 ```
 
-`IMAGE_READY`, `BACKING_UP`, `TRIAL_BOOT`, `CONFIRMED` and `ROLLBACK` remain
-reserved for later phases. Phase 6 does not claim backup or rollback safety.
+`active_version` is not promoted when installation finishes. It remains the
+last confirmed version until the trial application commits `CONFIRMED`.
+
+Backup progress is committed at 4 KiB W25Q sector boundaries. Install and
+rollback progress are committed at 1 KiB internal Flash page boundaries.
+Before each trial jump, `boot_attempts` is persisted and IWDG is started.
+Maximum unconfirmed attempts remain three.
 
 ## 3. Boot decision order
 
@@ -162,7 +174,10 @@ typedef struct
 } BootMetadata_t;
 ```
 
-Internal Flash contains complete Metadata A and B records in separate 1 KiB erase pages at `0x0800F800` and `0x0800FC00`. A new record is written to the older/invalid page, read back, CRC-validated and byte-compared. The currently selected page is not erased until a newer verified copy exists. External Metadata A/B is used from Phase 6 for the 36-byte CRC-protected application-to-bootloader install handoff; the remaining sector space is reserved.
+Internal Flash contains complete Metadata A and B records in separate 1 KiB erase pages at `0x0800F800` and `0x0800FC00`. A new record is written to the older/invalid page, read back, CRC-validated and byte-compared. The currently selected page is not erased until a newer verified copy exists. External Metadata A/B contains the 36-byte CRC-protected
+application-to-bootloader install handoff at offset `0x000` and, from Phase 7,
+a 40-byte CRC-protected persistent download checkpoint at offset `0x100`.
+The storage layers preserve the other record type across the 4 KiB sector erase.
 
 ## 5. Application validity
 
@@ -201,7 +216,10 @@ Essential self-test should cover enough functionality to decide that the release
 
 ### During download
 
-Active internal application is untouched. After reset, application resumes from `next_expected_offset`.
+Active internal application is untouched. A redundant external checkpoint is
+committed at each complete 4 KiB receive boundary. After reset, the application
+restores the newest valid checkpoint, re-erases the first uncheckpointed
+Incoming sector, and the PC resumes from that conservative offset.
 
 ### During patching
 

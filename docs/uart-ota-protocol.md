@@ -1,8 +1,11 @@
 # Custom UART OTA Protocol Version 1
 
-Status: **Protocol v1 frozen in Phase 0; UART/PC implemented in Phase 5; basic INSTALL handoff implemented in Phase 6**
+Status: **Protocol v1 frozen in Phase 0; UART/PC implemented in Phase 5; INSTALL in Phase 6; persistent resume in Phase 7**
 
-Phase 5/6 download progress is same-boot only. Persistent per-chunk recovery remains Phase 7.
+Phase 7 persists receive progress at complete 4 KiB W25Q sector boundaries.
+The PC sender uses 256-byte DATA chunks, so these checkpoints are also packet
+boundaries. After reset, QUERY/RESUME returns the newest valid persisted
+offset and the first uncheckpointed sector is retransmitted.
 
 ## 1. Physical UART configuration
 

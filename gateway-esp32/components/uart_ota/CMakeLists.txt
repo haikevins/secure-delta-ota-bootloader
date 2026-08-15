@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "uart_ota_protocol.c"
+        "uart_ota_plan.c"
+        "uart_ota_client.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        esp_driver_uart
+    PRIV_REQUIRES
+        esp_timer
+)

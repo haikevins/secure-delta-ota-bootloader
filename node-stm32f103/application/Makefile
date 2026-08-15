@@ -6,6 +6,7 @@ LOCAL_C_SOURCES := \
   src/main.c \
   src/ota_agent.c \
   src/ota_receiver.c \
+  src/trial_confirmation.c \
   src/phase4_flash_selftest.c \
   drivers/uart.c \
   protocol/cobs.c \
@@ -14,11 +15,13 @@ LOCAL_C_SOURCES := \
   protocol/ota_response.c \
   platform/system_clock.c \
   $(ROOT_DIR)/shared/src/crc32.c \
+  $(ROOT_DIR)/shared/src/download_checkpoint.c \
   $(ROOT_DIR)/shared/src/boot_metadata.c \
   $(ROOT_DIR)/shared/src/ext_flash_layout.c \
   $(ROOT_DIR)/shared/src/full_image_validation.c \
   $(ROOT_DIR)/shared/src/update_handoff.c \
   $(ROOT_DIR)/node-stm32f103/common/drivers/spi_flash.c \
+  $(ROOT_DIR)/node-stm32f103/common/storage/download_checkpoint_storage.c \
   $(ROOT_DIR)/node-stm32f103/common/storage/external_flash_storage.c \
   $(ROOT_DIR)/node-stm32f103/common/storage/update_handoff_storage.c \
   $(ROOT_DIR)/node-stm32f103/bootloader/storage/metadata_storage.c

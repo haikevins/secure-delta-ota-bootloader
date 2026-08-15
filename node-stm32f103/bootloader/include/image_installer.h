@@ -3,6 +3,12 @@
 
 #include "boot_metadata.h"
 
+#define IMAGE_INSTALLER_PHASE7_FAULT_MARKER 0xF7070001UL
+
+#define IMAGE_INSTALLER_PHASE8_ROLLBACK_TRIAL_LIMIT_BASE 0x0008B000UL
+#define IMAGE_INSTALLER_PHASE8_ROLLBACK_INVALID_TRIAL    0x0008B100UL
+#define IMAGE_INSTALLER_PHASE8_ROLLBACK_INSTALL_BASE     0x0008B200UL
+
 typedef enum
 {
     IMAGE_INSTALLER_OK = 0,
@@ -14,14 +20,40 @@ typedef enum
     IMAGE_INSTALLER_SOURCE_VECTOR_INVALID,
     IMAGE_INSTALLER_SOURCE_CRC_MISMATCH,
     IMAGE_INSTALLER_METADATA_COMMIT_FAILED,
+    IMAGE_INSTALLER_PROGRESS_INVALID,
     IMAGE_INSTALLER_FLASH_ERASE_FAILED,
     IMAGE_INSTALLER_FLASH_PROGRAM_FAILED,
+    IMAGE_INSTALLER_PAGE_VERIFY_FAILED,
+    IMAGE_INSTALLER_CHECKPOINT_CLEAR_FAILED,
     IMAGE_INSTALLER_VERIFY_CRC_FAILED,
     IMAGE_INSTALLER_VERIFY_VECTOR_FAILED,
-    IMAGE_INSTALLER_FINALIZE_FAILED
+    IMAGE_INSTALLER_FINALIZE_FAILED,
+    IMAGE_INSTALLER_BACKUP_HEADER_FAILED,
+    IMAGE_INSTALLER_BACKUP_ERASE_FAILED,
+    IMAGE_INSTALLER_BACKUP_WRITE_FAILED,
+    IMAGE_INSTALLER_BACKUP_VERIFY_FAILED,
+    IMAGE_INSTALLER_BACKUP_CRC_MISMATCH,
+    IMAGE_INSTALLER_BACKUP_PROGRESS_INVALID,
+    IMAGE_INSTALLER_ROLLBACK_SOURCE_INVALID,
+    IMAGE_INSTALLER_ROLLBACK_READ_FAILED,
+    IMAGE_INSTALLER_ROLLBACK_VERIFY_FAILED,
+    IMAGE_INSTALLER_TRIAL_TRANSITION_FAILED
 } ImageInstallerStatus_t;
 
+/*
+ * Historical name retained for Phase-6/7 callers. In Phase 8 the function
+ * performs: validate candidate -> backup active image -> page-checkpointed
+ * install -> verify -> enter TRIAL_BOOT. It no longer promotes active_version.
+ */
 ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(
+    const BootMetadata_t *metadata,
+    BootMetadata_t *result_metadata);
+
+/*
+ * Restore the complete 38 KiB application region from the validated W25Q
+ * backup. copy_offset is checkpointed every internal 1 KiB page.
+ */
+ImageInstallerStatus_t ImageInstaller_ProcessRollback(
     const BootMetadata_t *metadata,
     BootMetadata_t *result_metadata);
 

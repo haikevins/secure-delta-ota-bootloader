@@ -3,9 +3,14 @@
 #include <stdint.h>
 
 #include "application_jump.h"
+#include "backup_image.h"
+#include "backup_image_storage.h"
+#include "backup_progress.h"
 #include "crc32.h"
+#include "download_checkpoint_storage.h"
 #include "external_flash_storage.h"
 #include "full_image_validation.h"
+#include "install_progress.h"
 #include "memory_map.h"
 #include "metadata_storage.h"
 #include "spi_flash.h"
@@ -14,12 +19,19 @@
 #include "update_handoff.h"
 #include "update_handoff_storage.h"
 
-#define INSTALL_BUFFER_SIZE 256UL
-#define PHASE6_ERROR_BASE    0x00060000UL
+#define INSTALL_CRC_BUFFER_SIZE 256UL
+#define PHASE8_ERROR_BASE       0x00080000UL
+
+/*
+ * A complete internal Flash page is staged in SRAM before the corresponding
+ * application page is erased. The same buffer is also reused while backing up
+ * the active image to W25Q.
+ */
+static uint8_t g_install_page_buffer[INTERNAL_FLASH_PAGE_SIZE];
 
 static uint32_t InstallerError(ImageInstallerStatus_t status)
 {
-    return PHASE6_ERROR_BASE | (uint32_t)status;
+    return PHASE8_ERROR_BASE | (uint32_t)status;
 }
 
 static uint32_t GetPrimask(void)
@@ -57,8 +69,22 @@ static MetadataStorageStatus_t CommitMetadata(BootMetadata_t *metadata)
     BootMetadata_t committed;
     const MetadataStorageStatus_t status =
         MetadataStorage_Commit(metadata, &committed, (BootMetadataSlot_t *)0);
-    if (status == METADATA_STORAGE_OK) { *metadata = committed; }
+
+    if (status == METADATA_STORAGE_OK)
+    {
+        *metadata = committed;
+    }
+
     return status;
+}
+
+static void CopyResult(const BootMetadata_t *metadata,
+                       BootMetadata_t *result_metadata)
+{
+    if (result_metadata != (BootMetadata_t *)0)
+    {
+        *result_metadata = *metadata;
+    }
 }
 
 static ImageInstallerStatus_t RevertToActiveImage(
@@ -75,11 +101,19 @@ static ImageInstallerStatus_t RevertToActiveImage(
     metadata->boot_attempts = 0UL;
     metadata->last_error = InstallerError(reason);
 
+    /*
+     * The active internal image is still untouched in ARTIFACT_READY and
+     * BACKING_UP. Discarding the persistent download checkpoint prevents the
+     * application from resurrecting a rejected candidate on the next boot.
+     */
+    (void)DownloadCheckpointStorage_Clear();
+
     if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
     {
         return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
     }
-    if (result_metadata != (BootMetadata_t *)0) { *result_metadata = *metadata; }
+
+    CopyResult(metadata, result_metadata);
     return IMAGE_INSTALLER_SOURCE_REJECTED;
 }
 
@@ -91,11 +125,41 @@ static void BestEffortMarkFailed(BootMetadata_t *metadata,
     (void)CommitMetadata(metadata);
 }
 
+static uint32_t CalculateInternalCrc(uint32_t length)
+{
+    uint8_t buffer[INSTALL_CRC_BUFFER_SIZE];
+    uint32_t offset = 0UL;
+    uint32_t running = CRC32_IEEE_INITIAL_VALUE;
+
+    while (offset < length)
+    {
+        uint32_t chunk = length - offset;
+        uint32_t i;
+        volatile const uint8_t *source;
+
+        if (chunk > sizeof(buffer))
+        {
+            chunk = sizeof(buffer);
+        }
+
+        source = (volatile const uint8_t *)(APPLICATION_START_ADDRESS + offset);
+        for (i = 0UL; i < chunk; ++i)
+        {
+            buffer[i] = source[i];
+        }
+
+        running = Crc32_Update(running, buffer, chunk);
+        offset += chunk;
+    }
+
+    return running ^ CRC32_IEEE_FINAL_XOR;
+}
+
 static ImageInstallerStatus_t CalculateExternalCrc(
     uint32_t length,
     uint32_t *crc_out)
 {
-    uint8_t buffer[INSTALL_BUFFER_SIZE];
+    uint8_t buffer[INSTALL_CRC_BUFFER_SIZE];
     uint32_t offset = 0UL;
     uint32_t running = CRC32_IEEE_INITIAL_VALUE;
 
@@ -107,13 +171,51 @@ static ImageInstallerStatus_t CalculateExternalCrc(
     while (offset < length)
     {
         uint32_t chunk = length - offset;
-        if (chunk > sizeof(buffer)) { chunk = sizeof(buffer); }
+
+        if (chunk > sizeof(buffer))
+        {
+            chunk = sizeof(buffer);
+        }
 
         if (!ExternalFlashStorage_Read(EXTERNAL_FLASH_PARTITION_INCOMING,
                                        offset, buffer, chunk))
         {
             return IMAGE_INSTALLER_SOURCE_READ_FAILED;
         }
+
+        running = Crc32_Update(running, buffer, chunk);
+        offset += chunk;
+    }
+
+    *crc_out = running ^ CRC32_IEEE_FINAL_XOR;
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t CalculateBackupCrc(uint32_t *crc_out)
+{
+    uint8_t buffer[INSTALL_CRC_BUFFER_SIZE];
+    uint32_t offset = 0UL;
+    uint32_t running = CRC32_IEEE_INITIAL_VALUE;
+
+    if (crc_out == (uint32_t *)0)
+    {
+        return IMAGE_INSTALLER_BACKUP_VERIFY_FAILED;
+    }
+
+    while (offset < APPLICATION_MAX_SIZE)
+    {
+        uint32_t chunk = APPLICATION_MAX_SIZE - offset;
+
+        if (chunk > sizeof(buffer))
+        {
+            chunk = sizeof(buffer);
+        }
+
+        if (!BackupImageStorage_Read(offset, buffer, chunk))
+        {
+            return IMAGE_INSTALLER_BACKUP_VERIFY_FAILED;
+        }
+
         running = Crc32_Update(running, buffer, chunk);
         offset += chunk;
     }
@@ -143,7 +245,11 @@ static ImageInstallerStatus_t ValidateExternalSource(
     }
 
     crc_status = CalculateExternalCrc(record->image_size, &crc);
-    if (crc_status != IMAGE_INSTALLER_OK) { return crc_status; }
+    if (crc_status != IMAGE_INSTALLER_OK)
+    {
+        return crc_status;
+    }
+
     if (crc != record->image_crc32)
     {
         return IMAGE_INSTALLER_SOURCE_CRC_MISMATCH;
@@ -152,96 +258,410 @@ static ImageInstallerStatus_t ValidateExternalSource(
     return IMAGE_INSTALLER_OK;
 }
 
-static ImageInstallerStatus_t EraseAndProgramApplication(
-    const UpdateHandoffRecord_t *record)
+static ImageInstallerStatus_t ValidateBackupImage(
+    BackupImageRecord_t *record)
 {
-    uint8_t buffer[INSTALL_BUFFER_SIZE];
-    uint32_t page;
-    uint32_t offset = 0UL;
+    uint32_t crc = 0UL;
+    ImageInstallerStatus_t status;
+
+    if (BackupImageStorage_LoadHeader(record) != BACKUP_IMAGE_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_ROLLBACK_SOURCE_INVALID;
+    }
+
+    status = CalculateBackupCrc(&crc);
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        return status;
+    }
+
+    if (crc != record->image_crc32)
+    {
+        return IMAGE_INSTALLER_BACKUP_CRC_MISMATCH;
+    }
+
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t LoadIncomingPage(
+    const UpdateHandoffRecord_t *record,
+    uint32_t page_offset,
+    uint32_t *page_length)
+{
+    const uint32_t length =
+        InstallProgress_PageLength(record->image_size, page_offset);
+
+    if ((length == 0UL) || (page_length == (uint32_t *)0))
+    {
+        return IMAGE_INSTALLER_PROGRESS_INVALID;
+    }
+
+    if (!ExternalFlashStorage_Read(EXTERNAL_FLASH_PARTITION_INCOMING,
+                                   page_offset,
+                                   g_install_page_buffer,
+                                   length))
+    {
+        return IMAGE_INSTALLER_SOURCE_READ_FAILED;
+    }
+
+    *page_length = length;
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t LoadBackupPage(uint32_t page_offset,
+                                             uint32_t *page_length)
+{
+    const uint32_t length =
+        InstallProgress_PageLength(APPLICATION_MAX_SIZE, page_offset);
+
+    if ((length == 0UL) || (page_length == (uint32_t *)0))
+    {
+        return IMAGE_INSTALLER_PROGRESS_INVALID;
+    }
+
+    if (!BackupImageStorage_Read(page_offset,
+                                 g_install_page_buffer,
+                                 length))
+    {
+        return IMAGE_INSTALLER_ROLLBACK_READ_FAILED;
+    }
+
+    *page_length = length;
+    return IMAGE_INSTALLER_OK;
+}
+
+#if defined(PHASE7_FAULT_INJECT_OFFSET)
+static uint8_t ShouldInjectReset(const BootMetadata_t *metadata,
+                                 uint32_t page_offset,
+                                 uint32_t page_length,
+                                 uint32_t bytes_programmed)
+{
+    const uint32_t inject_offset = (uint32_t)PHASE7_FAULT_INJECT_OFFSET;
+    const uint32_t page_end = page_offset + page_length;
+
+    return (uint8_t)(
+        (metadata != (const BootMetadata_t *)0) &&
+        (metadata->last_error != IMAGE_INSTALLER_PHASE7_FAULT_MARKER) &&
+        (inject_offset > page_offset) &&
+        (inject_offset < page_end) &&
+        ((page_offset + bytes_programmed) >= inject_offset));
+}
+
+static ImageInstallerStatus_t InjectOneShotReset(BootMetadata_t *metadata)
+{
+    /*
+     * copy_offset intentionally remains at the previous verified page.
+     * The current page is only partially programmed. After reset the normal
+     * path re-erases this page before programming it again.
+     */
+    metadata->last_error = IMAGE_INSTALLER_PHASE7_FAULT_MARKER;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+
+    NVIC_SystemReset();
+    for (;;)
+    {
+        __NOP();
+    }
+}
+#endif
+
+static ImageInstallerStatus_t ProgramBufferedApplicationPage(
+    uint32_t page_offset,
+    uint32_t page_length,
+    BootMetadata_t *metadata,
+    uint8_t allow_phase7_fault)
+{
+    uint32_t i;
     uint32_t primask;
     FLASH_Status flash_status;
+    volatile const uint8_t *installed;
 
     primask = GetPrimask();
     __disable_irq();
 
     FLASH_Unlock();
-    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
+    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR |
+                    FLASH_FLAG_WRPRTERR);
 
-    for (page = APPLICATION_START_ADDRESS;
-         page < APPLICATION_END_ADDRESS;
-         page += INTERNAL_FLASH_PAGE_SIZE)
+    flash_status = FLASH_ErasePage(APPLICATION_START_ADDRESS + page_offset);
+    if (flash_status != FLASH_COMPLETE)
     {
-        flash_status = FLASH_ErasePage(page);
+        FLASH_Lock();
+        RestorePrimask(primask);
+        return IMAGE_INSTALLER_FLASH_ERASE_FAILED;
+    }
+
+    for (i = 0UL; i < page_length; i += 2UL)
+    {
+        const uint8_t high =
+            ((i + 1UL) < page_length) ? g_install_page_buffer[i + 1UL] : 0xFFU;
+        const uint16_t halfword =
+            (uint16_t)((uint16_t)g_install_page_buffer[i] |
+                       ((uint16_t)high << 8U));
+
+        flash_status = FLASH_ProgramHalfWord(
+            APPLICATION_START_ADDRESS + page_offset + i,
+            halfword);
+
         if (flash_status != FLASH_COMPLETE)
         {
             FLASH_Lock();
             RestorePrimask(primask);
-            return IMAGE_INSTALLER_FLASH_ERASE_FAILED;
+            return IMAGE_INSTALLER_FLASH_PROGRAM_FAILED;
         }
-    }
 
-    while (offset < record->image_size)
-    {
-        uint32_t chunk = record->image_size - offset;
-        uint32_t i;
-
-        if (chunk > sizeof(buffer)) { chunk = sizeof(buffer); }
-
-        if (!ExternalFlashStorage_Read(EXTERNAL_FLASH_PARTITION_INCOMING,
-                                       offset, buffer, chunk))
+#if defined(PHASE7_FAULT_INJECT_OFFSET)
+        if ((allow_phase7_fault != 0U) &&
+            (ShouldInjectReset(metadata, page_offset, page_length,
+                               i + 2UL) != 0U))
         {
             FLASH_Lock();
             RestorePrimask(primask);
-            return IMAGE_INSTALLER_SOURCE_READ_FAILED;
+            return InjectOneShotReset(metadata);
         }
-
-        for (i = 0UL; i < chunk; i += 2UL)
-        {
-            const uint8_t high =
-                ((i + 1UL) < chunk) ? buffer[i + 1UL] : 0xFFU;
-            const uint16_t halfword =
-                (uint16_t)((uint16_t)buffer[i] |
-                           ((uint16_t)high << 8U));
-
-            flash_status = FLASH_ProgramHalfWord(
-                APPLICATION_START_ADDRESS + offset + i,
-                halfword);
-            if (flash_status != FLASH_COMPLETE)
-            {
-                FLASH_Lock();
-                RestorePrimask(primask);
-                return IMAGE_INSTALLER_FLASH_PROGRAM_FAILED;
-            }
-        }
-
-        offset += chunk;
+#else
+        (void)allow_phase7_fault;
+        (void)metadata;
+#endif
     }
 
     FLASH_Lock();
     RestorePrimask(primask);
+
+    installed = (volatile const uint8_t *)(APPLICATION_START_ADDRESS +
+                                           page_offset);
+    for (i = 0UL; i < page_length; ++i)
+    {
+        if (installed[i] != g_install_page_buffer[i])
+        {
+            return IMAGE_INSTALLER_PAGE_VERIFY_FAILED;
+        }
+    }
+
     return IMAGE_INSTALLER_OK;
 }
 
-static uint32_t CalculateInternalCrc(uint32_t length)
+static ImageInstallerStatus_t ProgramAndVerifyIncomingPage(
+    const UpdateHandoffRecord_t *record,
+    uint32_t page_offset,
+    BootMetadata_t *metadata)
 {
-    uint8_t buffer[INSTALL_BUFFER_SIZE];
-    uint32_t offset = 0UL;
-    uint32_t running = CRC32_IEEE_INITIAL_VALUE;
+    uint32_t page_length = 0UL;
+    ImageInstallerStatus_t status =
+        LoadIncomingPage(record, page_offset, &page_length);
 
-    while (offset < length)
+    if (status != IMAGE_INSTALLER_OK)
     {
-        uint32_t chunk = length - offset;
+        return status;
+    }
+
+    return ProgramBufferedApplicationPage(page_offset,
+                                          page_length,
+                                          metadata,
+                                          1U);
+}
+
+static ImageInstallerStatus_t ProgramAndVerifyBackupPage(
+    uint32_t page_offset,
+    BootMetadata_t *metadata)
+{
+    uint32_t page_length = 0UL;
+    ImageInstallerStatus_t status =
+        LoadBackupPage(page_offset, &page_length);
+
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        return status;
+    }
+
+    return ProgramBufferedApplicationPage(page_offset,
+                                          page_length,
+                                          metadata,
+                                          0U);
+}
+
+static ImageInstallerStatus_t BeginBackup(BootMetadata_t *metadata)
+{
+    if (BackupImageStorage_InvalidateHeader() != BACKUP_IMAGE_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_BACKUP_HEADER_FAILED;
+    }
+
+    metadata->state = (uint32_t)UPDATE_BACKING_UP;
+    metadata->copy_offset = 0UL;
+    metadata->boot_attempts = 0UL;
+    metadata->last_error = 0UL;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t CopyActiveImageToBackupChunk(
+    uint32_t chunk_offset,
+    uint32_t chunk_length)
+{
+    uint32_t copied = 0UL;
+
+    if (!BackupImageStorage_EraseSector(chunk_offset))
+    {
+        return IMAGE_INSTALLER_BACKUP_ERASE_FAILED;
+    }
+
+    while (copied < chunk_length)
+    {
+        uint32_t length = chunk_length - copied;
         uint32_t i;
         volatile const uint8_t *source;
 
-        if (chunk > sizeof(buffer)) { chunk = sizeof(buffer); }
-        source = (volatile const uint8_t *)(APPLICATION_START_ADDRESS + offset);
-        for (i = 0UL; i < chunk; ++i) { buffer[i] = source[i]; }
-        running = Crc32_Update(running, buffer, chunk);
-        offset += chunk;
+        if (length > sizeof(g_install_page_buffer))
+        {
+            length = sizeof(g_install_page_buffer);
+        }
+
+        source = (volatile const uint8_t *)(APPLICATION_START_ADDRESS +
+                                            chunk_offset + copied);
+        for (i = 0UL; i < length; ++i)
+        {
+            g_install_page_buffer[i] = source[i];
+        }
+
+        if (!BackupImageStorage_Write(chunk_offset + copied,
+                                      g_install_page_buffer,
+                                      length))
+        {
+            return IMAGE_INSTALLER_BACKUP_WRITE_FAILED;
+        }
+
+        if (!BackupImageStorage_Verify(chunk_offset + copied,
+                                       g_install_page_buffer,
+                                       length))
+        {
+            return IMAGE_INSTALLER_BACKUP_VERIFY_FAILED;
+        }
+
+        copied += length;
     }
 
-    return running ^ CRC32_IEEE_FINAL_XOR;
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t ResumeBackup(BootMetadata_t *metadata)
+{
+    ImageInstallerStatus_t status;
+    uint32_t internal_crc;
+    uint32_t backup_crc = 0UL;
+    BackupImageRecord_t requested;
+    BackupImageRecord_t committed;
+
+    if (BackupProgress_Validate(metadata->copy_offset) !=
+        BACKUP_PROGRESS_VALID)
+    {
+        return IMAGE_INSTALLER_BACKUP_PROGRESS_INVALID;
+    }
+
+    while (metadata->copy_offset < APPLICATION_MAX_SIZE)
+    {
+        const uint32_t chunk_offset = metadata->copy_offset;
+        const uint32_t chunk_length =
+            BackupProgress_ChunkLength(chunk_offset);
+        const uint32_t next_offset =
+            BackupProgress_NextCheckpoint(chunk_offset);
+
+        status = CopyActiveImageToBackupChunk(chunk_offset, chunk_length);
+        if (status != IMAGE_INSTALLER_OK)
+        {
+            return status;
+        }
+
+        /*
+         * A power cut during a 4 KiB W25Q sector copy leaves copy_offset at
+         * the previous sector boundary. Recovery re-erases and rewrites that
+         * entire sector.
+         */
+        metadata->copy_offset = next_offset;
+        metadata->last_error = 0UL;
+
+        if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+        {
+            return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+        }
+    }
+
+    internal_crc = CalculateInternalCrc(APPLICATION_MAX_SIZE);
+    status = CalculateBackupCrc(&backup_crc);
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        return status;
+    }
+    if (internal_crc != backup_crc)
+    {
+        return IMAGE_INSTALLER_BACKUP_CRC_MISMATCH;
+    }
+
+    BackupImage_Init(&requested, metadata->active_version, backup_crc);
+    if (BackupImageStorage_CommitHeader(&requested, &committed) !=
+        BACKUP_IMAGE_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_BACKUP_HEADER_FAILED;
+    }
+
+    metadata->state = (uint32_t)UPDATE_INSTALLING;
+    metadata->copy_offset = 0UL;
+    metadata->last_error = 0UL;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t ResumePageCheckpointedCopy(
+    const UpdateHandoffRecord_t *record,
+    BootMetadata_t *metadata)
+{
+    ImageInstallerStatus_t status;
+
+    if (InstallProgress_Validate(record->image_size,
+                                 metadata->copy_offset) !=
+        INSTALL_PROGRESS_VALID)
+    {
+        return IMAGE_INSTALLER_PROGRESS_INVALID;
+    }
+
+    while (metadata->copy_offset < record->image_size)
+    {
+        const uint32_t page_offset = metadata->copy_offset;
+        const uint32_t next_offset =
+            InstallProgress_NextCheckpoint(record->image_size, page_offset);
+
+        status = ProgramAndVerifyIncomingPage(record,
+                                              page_offset,
+                                              metadata);
+        if (status != IMAGE_INSTALLER_OK)
+        {
+            return status;
+        }
+
+        metadata->copy_offset = next_offset;
+        metadata->last_error = 0UL;
+
+        if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+        {
+            return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+        }
+    }
+
+    return IMAGE_INSTALLER_OK;
 }
 
 static ImageInstallerStatus_t VerifyInstalledApplication(
@@ -263,7 +683,8 @@ static ImageInstallerStatus_t VerifyInstalledApplication(
     }
 
     if (ApplicationJump_Validate(APPLICATION_START_ADDRESS,
-                                 &application_vector) != APPLICATION_VALIDATION_OK)
+                                 &application_vector) !=
+        APPLICATION_VALIDATION_OK)
     {
         return IMAGE_INSTALLER_VERIFY_VECTOR_FAILED;
     }
@@ -271,28 +692,275 @@ static ImageInstallerStatus_t VerifyInstalledApplication(
     return IMAGE_INSTALLER_OK;
 }
 
-static ImageInstallerStatus_t FinalizeSuccessfulInstall(
+static ImageInstallerStatus_t TransitionToVerify(
     BootMetadata_t *metadata,
-    const UpdateHandoffRecord_t *record,
+    uint32_t image_size)
+{
+    metadata->state = (uint32_t)UPDATE_VERIFYING_INSTALL;
+    metadata->copy_offset = image_size;
+    metadata->last_error = 0UL;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t BeginInstall(BootMetadata_t *metadata)
+{
+    metadata->state = (uint32_t)UPDATE_INSTALLING;
+    metadata->copy_offset = 0UL;
+    metadata->last_error = 0UL;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t TransitionToTrialBoot(
+    BootMetadata_t *metadata,
     BootMetadata_t *result_metadata)
 {
-    metadata->state = (uint32_t)UPDATE_IDLE;
-    metadata->active_version = record->target_version;
-    metadata->pending_version = 0UL;
-    metadata->active_update_id = 0UL;
-    metadata->received_size = 0UL;
-    metadata->expected_size = 0UL;
+    /*
+     * The incoming candidate is no longer required for recovery after internal
+     * verify: rollback uses the separate validated backup. Clear the Phase-7
+     * download checkpoint before publishing TRIAL_BOOT. A reset before the
+     * metadata commit simply re-enters VERIFYING_INSTALL and retries.
+     */
+    if (DownloadCheckpointStorage_Clear() !=
+        DOWNLOAD_CHECKPOINT_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_CHECKPOINT_CLEAR_FAILED;
+    }
+
+    metadata->state = (uint32_t)UPDATE_TRIAL_BOOT;
     metadata->copy_offset = 0UL;
     metadata->boot_attempts = 0UL;
     metadata->last_error = 0UL;
 
     if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
     {
+        return IMAGE_INSTALLER_TRIAL_TRANSITION_FAILED;
+    }
+
+    CopyResult(metadata, result_metadata);
+    return IMAGE_INSTALLER_OK;
+}
+
+static uint32_t RollbackDiagnostic(const BootMetadata_t *metadata)
+{
+    if (metadata->state == (uint32_t)UPDATE_ROLLBACK)
+    {
+        return metadata->last_error;
+    }
+
+    if (metadata->boot_attempts >= BOOT_METADATA_MAX_BOOT_ATTEMPTS)
+    {
+        return IMAGE_INSTALLER_PHASE8_ROLLBACK_TRIAL_LIMIT_BASE |
+               (metadata->boot_attempts & 0xFFUL);
+    }
+
+    if (metadata->state == (uint32_t)UPDATE_TRIAL_BOOT)
+    {
+        return IMAGE_INSTALLER_PHASE8_ROLLBACK_INVALID_TRIAL;
+    }
+
+    return IMAGE_INSTALLER_PHASE8_ROLLBACK_INSTALL_BASE;
+}
+
+static ImageInstallerStatus_t BeginRollback(
+    BootMetadata_t *metadata,
+    uint32_t diagnostic)
+{
+    metadata->state = (uint32_t)UPDATE_ROLLBACK;
+    metadata->copy_offset = 0UL;
+    metadata->last_error = diagnostic;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t ResumeRollbackCopy(BootMetadata_t *metadata)
+{
+    ImageInstallerStatus_t status;
+
+    if (InstallProgress_Validate(APPLICATION_MAX_SIZE,
+                                 metadata->copy_offset) !=
+        INSTALL_PROGRESS_VALID)
+    {
+        return IMAGE_INSTALLER_PROGRESS_INVALID;
+    }
+
+    while (metadata->copy_offset < APPLICATION_MAX_SIZE)
+    {
+        const uint32_t page_offset = metadata->copy_offset;
+        const uint32_t next_offset =
+            InstallProgress_NextCheckpoint(APPLICATION_MAX_SIZE,
+                                           page_offset);
+
+        status = ProgramAndVerifyBackupPage(page_offset, metadata);
+        if (status != IMAGE_INSTALLER_OK)
+        {
+            return status;
+        }
+
+        metadata->copy_offset = next_offset;
+        /* Preserve rollback diagnostic in last_error across every checkpoint. */
+
+        if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+        {
+            return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+        }
+    }
+
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t VerifyRolledBackApplication(
+    const BackupImageRecord_t *backup)
+{
+    volatile const uint32_t *vector =
+        (volatile const uint32_t *)APPLICATION_START_ADDRESS;
+    ApplicationVector_t application_vector;
+
+    if (CalculateInternalCrc(APPLICATION_MAX_SIZE) != backup->image_crc32)
+    {
+        return IMAGE_INSTALLER_ROLLBACK_VERIFY_FAILED;
+    }
+
+    if (FullImage_ValidateVector(APPLICATION_MAX_SIZE,
+                                 vector[0], vector[1]) != FULL_IMAGE_VALID)
+    {
+        return IMAGE_INSTALLER_ROLLBACK_VERIFY_FAILED;
+    }
+
+    if (ApplicationJump_Validate(APPLICATION_START_ADDRESS,
+                                 &application_vector) !=
+        APPLICATION_VALIDATION_OK)
+    {
+        return IMAGE_INSTALLER_ROLLBACK_VERIFY_FAILED;
+    }
+
+    return IMAGE_INSTALLER_OK;
+}
+
+static ImageInstallerStatus_t FinalizeRollback(
+    BootMetadata_t *metadata,
+    const BackupImageRecord_t *backup,
+    uint32_t diagnostic,
+    BootMetadata_t *result_metadata)
+{
+    (void)DownloadCheckpointStorage_Clear();
+
+    metadata->state = (uint32_t)UPDATE_IDLE;
+    metadata->active_version = backup->active_version;
+    metadata->pending_version = 0UL;
+    metadata->active_update_id = 0UL;
+    metadata->received_size = 0UL;
+    metadata->expected_size = 0UL;
+    metadata->copy_offset = 0UL;
+    metadata->boot_attempts = 0UL;
+    /*
+     * Unlike a successful confirmation, rollback retains a compact diagnostic
+     * so hardware tests and field logs can prove why the previous candidate
+     * was rejected. IDLE permits a non-zero last_error.
+     */
+    metadata->last_error = diagnostic;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
         return IMAGE_INSTALLER_FINALIZE_FAILED;
     }
 
-    if (result_metadata != (BootMetadata_t *)0) { *result_metadata = *metadata; }
+    CopyResult(metadata, result_metadata);
     return IMAGE_INSTALLER_OK;
+}
+
+ImageInstallerStatus_t ImageInstaller_ProcessRollback(
+    const BootMetadata_t *metadata,
+    BootMetadata_t *result_metadata)
+{
+    BootMetadata_t working;
+    BackupImageRecord_t backup;
+    ImageInstallerStatus_t status;
+    uint32_t diagnostic;
+
+    if (metadata == (const BootMetadata_t *)0)
+    {
+        return IMAGE_INSTALLER_ROLLBACK_SOURCE_INVALID;
+    }
+
+    working = *metadata;
+
+    if (!ExternalFlashStorage_Init())
+    {
+        return IMAGE_INSTALLER_EXTERNAL_FLASH_INIT_FAILED;
+    }
+
+    status = ValidateBackupImage(&backup);
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        BestEffortMarkFailed(&working, IMAGE_INSTALLER_ROLLBACK_SOURCE_INVALID);
+        return IMAGE_INSTALLER_ROLLBACK_SOURCE_INVALID;
+    }
+
+    diagnostic = RollbackDiagnostic(&working);
+
+    if (working.state != (uint32_t)UPDATE_ROLLBACK)
+    {
+        status = BeginRollback(&working, diagnostic);
+        if (status != IMAGE_INSTALLER_OK)
+        {
+            return status;
+        }
+    }
+    else if (InstallProgress_Validate(APPLICATION_MAX_SIZE,
+                                      working.copy_offset) !=
+             INSTALL_PROGRESS_VALID)
+    {
+        BestEffortMarkFailed(&working, IMAGE_INSTALLER_PROGRESS_INVALID);
+        return IMAGE_INSTALLER_PROGRESS_INVALID;
+    }
+
+    status = ResumeRollbackCopy(&working);
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        BestEffortMarkFailed(&working, status);
+        return status;
+    }
+
+    status = VerifyRolledBackApplication(&backup);
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        BestEffortMarkFailed(&working, status);
+        return status;
+    }
+
+    return FinalizeRollback(&working, &backup, diagnostic, result_metadata);
+}
+
+static ImageInstallerStatus_t RollbackAfterInstallFailure(
+    BootMetadata_t *metadata,
+    ImageInstallerStatus_t reason,
+    BootMetadata_t *result_metadata)
+{
+    metadata->last_error =
+        IMAGE_INSTALLER_PHASE8_ROLLBACK_INSTALL_BASE |
+        ((uint32_t)reason & 0xFFUL);
+
+    if (BeginRollback(metadata, metadata->last_error) != IMAGE_INSTALLER_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+
+    return ImageInstaller_ProcessRollback(metadata, result_metadata);
 }
 
 ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(
@@ -302,15 +970,18 @@ ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(
     BootMetadata_t working;
     UpdateHandoffRecord_t record;
     UpdateHandoffStorageStatus_t handoff_status;
+    BackupImageRecord_t backup;
     ImageInstallerStatus_t status;
-    const uint8_t install_already_started =
+    const uint8_t internal_may_be_modified =
         (uint8_t)((metadata != (const BootMetadata_t *)0) &&
-                  (metadata->state != (uint32_t)UPDATE_ARTIFACT_READY));
+                  ((metadata->state == (uint32_t)UPDATE_INSTALLING) ||
+                   (metadata->state == (uint32_t)UPDATE_VERIFYING_INSTALL)));
 
     if (metadata == (const BootMetadata_t *)0)
     {
         return IMAGE_INSTALLER_HANDOFF_MISMATCH;
     }
+
     working = *metadata;
 
     if (!ExternalFlashStorage_Init())
@@ -322,26 +993,83 @@ ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(
                                                (UpdateHandoffSlot_t *)0);
     if (handoff_status != UPDATE_HANDOFF_STORAGE_OK)
     {
-        if (install_already_started == 0U)
+        if (internal_may_be_modified == 0U)
         {
             return RevertToActiveImage(&working,
                                        IMAGE_INSTALLER_HANDOFF_LOAD_FAILED,
                                        result_metadata);
         }
-        BestEffortMarkFailed(&working, IMAGE_INSTALLER_HANDOFF_LOAD_FAILED);
-        return IMAGE_INSTALLER_HANDOFF_LOAD_FAILED;
+
+        return RollbackAfterInstallFailure(
+            &working,
+            IMAGE_INSTALLER_HANDOFF_LOAD_FAILED,
+            result_metadata);
     }
 
     if (RecordMatchesMetadata(&record, &working) == 0U)
     {
-        if (install_already_started == 0U)
+        if (internal_may_be_modified == 0U)
         {
             return RevertToActiveImage(&working,
                                        IMAGE_INSTALLER_HANDOFF_MISMATCH,
                                        result_metadata);
         }
-        BestEffortMarkFailed(&working, IMAGE_INSTALLER_HANDOFF_MISMATCH);
-        return IMAGE_INSTALLER_HANDOFF_MISMATCH;
+
+        return RollbackAfterInstallFailure(
+            &working,
+            IMAGE_INSTALLER_HANDOFF_MISMATCH,
+            result_metadata);
+    }
+
+    /*
+     * Candidate source is revalidated on every recovery boot. During backup
+     * the old active application is still intact, so a bad source can simply
+     * be rejected. Once INSTALLING begins, a bad source triggers restoration
+     * from the already validated backup instead.
+     */
+    status = ValidateExternalSource(&record);
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        if (internal_may_be_modified == 0U)
+        {
+            return RevertToActiveImage(&working, status, result_metadata);
+        }
+
+        return RollbackAfterInstallFailure(&working, status, result_metadata);
+    }
+
+    if (working.state == (uint32_t)UPDATE_ARTIFACT_READY)
+    {
+        status = BeginBackup(&working);
+        if (status != IMAGE_INSTALLER_OK)
+        {
+            BestEffortMarkFailed(&working, status);
+            return status;
+        }
+    }
+
+    if (working.state == (uint32_t)UPDATE_BACKING_UP)
+    {
+        status = ResumeBackup(&working);
+        if (status != IMAGE_INSTALLER_OK)
+        {
+            /*
+             * Internal app remains untouched until backup has completely
+             * verified and the metadata state reaches INSTALLING.
+             */
+            return RevertToActiveImage(&working, status, result_metadata);
+        }
+    }
+
+    /*
+     * From this point onward backup must remain valid throughout install and
+     * trial. Detect backup corruption before touching/re-touching internal app.
+     */
+    status = ValidateBackupImage(&backup);
+    if (status != IMAGE_INSTALLER_OK)
+    {
+        BestEffortMarkFailed(&working, status);
+        return status;
     }
 
     if (working.state == (uint32_t)UPDATE_VERIFYING_INSTALL)
@@ -349,53 +1077,61 @@ ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(
         status = VerifyInstalledApplication(&record);
         if (status == IMAGE_INSTALLER_OK)
         {
-            return FinalizeSuccessfulInstall(&working, &record,
-                                             result_metadata);
+            return TransitionToTrialBoot(&working, result_metadata);
         }
-        /* Coarse Phase-6 recovery: reinstall from offset zero. Phase 7 adds
-         * persistent copy checkpoints instead of restarting the whole copy. */
-    }
 
-    status = ValidateExternalSource(&record);
-    if (status != IMAGE_INSTALLER_OK)
-    {
-        if (install_already_started == 0U)
+        /*
+         * Candidate source is still valid (checked above), so retry install
+         * from page zero. The active backup remains untouched.
+         */
+        status = BeginInstall(&working);
+        if (status != IMAGE_INSTALLER_OK)
         {
-            return RevertToActiveImage(&working, status, result_metadata);
+            return status;
         }
-        BestEffortMarkFailed(&working, status);
-        return status;
     }
-
-    working.state = (uint32_t)UPDATE_INSTALLING;
-    working.copy_offset = 0UL;
-    working.last_error = 0UL;
-    if (CommitMetadata(&working) != METADATA_STORAGE_OK)
+    else if (working.state == (uint32_t)UPDATE_INSTALLING)
     {
-        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+        if (InstallProgress_Validate(record.image_size,
+                                     working.copy_offset) !=
+            INSTALL_PROGRESS_VALID)
+        {
+            return RollbackAfterInstallFailure(
+                &working,
+                IMAGE_INSTALLER_PROGRESS_INVALID,
+                result_metadata);
+        }
+    }
+    else
+    {
+        return RollbackAfterInstallFailure(
+            &working,
+            IMAGE_INSTALLER_HANDOFF_MISMATCH,
+            result_metadata);
     }
 
-    status = EraseAndProgramApplication(&record);
+    status = ResumePageCheckpointedCopy(&record, &working);
     if (status != IMAGE_INSTALLER_OK)
     {
-        BestEffortMarkFailed(&working, status);
-        return status;
+        if (status == IMAGE_INSTALLER_METADATA_COMMIT_FAILED)
+        {
+            return status;
+        }
+
+        return RollbackAfterInstallFailure(&working, status, result_metadata);
     }
 
-    working.state = (uint32_t)UPDATE_VERIFYING_INSTALL;
-    working.copy_offset = record.image_size;
-    if (CommitMetadata(&working) != METADATA_STORAGE_OK)
+    status = TransitionToVerify(&working, record.image_size);
+    if (status != IMAGE_INSTALLER_OK)
     {
-        BestEffortMarkFailed(&working, IMAGE_INSTALLER_METADATA_COMMIT_FAILED);
-        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+        return status;
     }
 
     status = VerifyInstalledApplication(&record);
     if (status != IMAGE_INSTALLER_OK)
     {
-        BestEffortMarkFailed(&working, status);
-        return status;
+        return RollbackAfterInstallFailure(&working, status, result_metadata);
     }
 
-    return FinalizeSuccessfulInstall(&working, &record, result_metadata);
+    return TransitionToTrialBoot(&working, result_metadata);
 }

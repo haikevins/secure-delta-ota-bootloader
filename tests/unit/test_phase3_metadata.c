@@ -138,8 +138,12 @@ static void TestBootDecision(void)
     assert(decision.action == BOOT_ACTION_RESUME_DOWNLOAD);
 
     metadata.state = (uint32_t)UPDATE_TRIAL_BOOT;
-    metadata.received_size = 0UL;
-    metadata.expected_size = 0UL;
+    /*
+     * Phase 8 makes TRIAL_BOOT a live persistent state. Keep the Phase-3
+     * decision test, but construct it with the now-required complete update
+     * payload inherited from ValidReceiving().
+     */
+    metadata.received_size = metadata.expected_size;
     metadata.boot_attempts = BOOT_METADATA_MAX_BOOT_ATTEMPTS;
     BootMetadata_Finalize(&metadata);
     assert(BootMetadata_Validate(&metadata) == BOOT_METADATA_VALID);

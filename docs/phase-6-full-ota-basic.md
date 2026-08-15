@@ -1,6 +1,6 @@
 # Phase 6 — Basic Full OTA
 
-Status: **implemented; physical end-to-end OTA validation pending**
+Status: **complete; end-to-end hardware verified**
 
 ## Scope
 
@@ -100,11 +100,12 @@ and boots the new application.
 
 ## Phase-6 recovery boundary
 
-Phase 6 can restart the *whole* installation from offset zero when metadata says
-`INSTALLING`, and can re-check/reinstall from `VERIFYING_INSTALL`.
+The original Phase-6 implementation can restart the *whole* installation from
+offset zero when metadata says `INSTALLING`, and can re-check/reinstall from
+`VERIFYING_INSTALL`.
 
-It does **not** checkpoint each copied internal Flash page. Fine-grained
-power-loss recovery using `copy_offset` belongs to Phase 7.
+Phase 7 supersedes this coarse behavior with persistent UART download
+checkpoints and page-by-page internal installation checkpoints.
 
 There is also no backup/rollback yet. A source artifact rejected before erase
 leaves the active application untouched. A power failure or programming failure

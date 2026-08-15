@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PC UART client for Secure Delta OTA Phase 5/6."""
+"""PC UART client for Secure Delta OTA Phase 5/6/7."""
 from __future__ import annotations
 
 import argparse
@@ -12,7 +12,7 @@ from ota_uart_protocol import (
     CMD_QUERY, CMD_RESUME, CMD_START, CMD_STATUS,
     Packet, ProtocolError,
     STATUS_OK, STATUS_PACKET_CRC_ERROR, STATUS_WRONG_SEQUENCE,
-    UPDATE_ARTIFACT_READY, UPDATE_IDLE,
+    UPDATE_ARTIFACT_READY, UPDATE_IDLE, UPDATE_RECEIVING,
     build_start_payload, cobs_encode, crc32, decode_frame,
     encode_frame, parse_ack, parse_hello, serialize_packet,
 )
@@ -138,7 +138,8 @@ def control(link: SerialLink, command: int, update_id: int = 0):
     )
     return info
 
-def transfer(link: SerialLink, data: bytes, update_id: int, target_version: int = 0) -> None:
+def transfer(link: SerialLink, data: bytes, update_id: int,
+             target_version: int = 0) -> None:
     if not data:
         raise ProtocolError("artifact must not be empty")
     if len(data) > MAX_ARTIFACT:
@@ -147,25 +148,58 @@ def transfer(link: SerialLink, data: bytes, update_id: int, target_version: int 
         raise ProtocolError("update_id must be non-zero")
 
     state = parse_hello(link.request(Packet(command=CMD_QUERY)))
-    if state.update_state != UPDATE_IDLE:
-        require_ack(
-            link.request(Packet(command=CMD_ABORT,
-                                update_id=state.active_update_id)),
-            "ABORT before START"
-        )
-
-    artifact_crc = crc32(data)
-    require_ack(
-        link.request(Packet(
-            command=CMD_START,
-            update_id=update_id,
-            payload=build_start_payload(len(data), artifact_crc, target_version=target_version)
-        )),
-        "START"
-    )
-
     offset = 0
     sequence = 0
+
+    if (state.update_state == UPDATE_RECEIVING and
+            state.active_update_id == update_id and
+            state.expected_artifact_size == len(data)):
+        resume = require_ack(
+            link.request(Packet(command=CMD_RESUME, update_id=update_id)),
+            "RESUME"
+        )
+        offset = resume.next_expected_offset
+        if offset > len(data) or (offset % 256) != 0:
+            raise ProtocolError(
+                f"device returned invalid persistent resume offset {offset}"
+            )
+        sequence = (offset // 256) & 0xFFFF
+        print(
+            f"Persistent RESUME: offset={offset}/{len(data)} "
+            f"sequence={sequence}"
+        )
+
+    elif (state.update_state == UPDATE_ARTIFACT_READY and
+          state.active_update_id == update_id and
+          state.expected_artifact_size == len(data)):
+        print(
+            f"Artifact already ready: update_id=0x{update_id:08X} "
+            f"size={len(data)}"
+        )
+        return
+
+    else:
+        if state.update_state != UPDATE_IDLE:
+            require_ack(
+                link.request(Packet(command=CMD_ABORT,
+                                    update_id=state.active_update_id)),
+                "ABORT before START"
+            )
+
+        artifact_crc = crc32(data)
+        require_ack(
+            link.request(Packet(
+                command=CMD_START,
+                update_id=update_id,
+                payload=build_start_payload(
+                    len(data),
+                    artifact_crc,
+                    target_version=target_version
+                )
+            )),
+            "START"
+        )
+
     while offset < len(data):
         chunk = data[offset:offset + 256]
         packet = Packet(CMD_DATA, update_id, offset, sequence, chunk)
@@ -183,20 +217,21 @@ def transfer(link: SerialLink, data: bytes, update_id: int, target_version: int 
     if finish.update_state != UPDATE_ARTIFACT_READY:
         raise ProtocolError("FINISH did not enter ARTIFACT_READY")
 
-    # Retry FINISH once deliberately to verify idempotence.
+    # FINISH remains idempotent across retry.
     finish_retry = require_ack(link.request(finish_packet), "FINISH retry")
     if finish_retry.update_state != UPDATE_ARTIFACT_READY:
         raise ProtocolError("FINISH retry lost ARTIFACT_READY")
 
     print(
         f"Transfer PASS update_id=0x{update_id:08X} "
-        f"size={len(data)} crc32=0x{artifact_crc:08X}"
+        f"size={len(data)} crc32=0x{crc32(data):08X}"
     )
 
 
 def wait_for_application_version(link: SerialLink,
                                  target_version: int,
-                                 wait_seconds: float = 20.0):
+                                 wait_seconds: float = 20.0,
+                                 required_state: int | None = None):
     deadline = time.monotonic() + wait_seconds
     old_timeout = link.timeout
     old_retries = link.retries
@@ -212,7 +247,9 @@ def wait_for_application_version(link: SerialLink,
                     command=CMD_HELLO, update_id=0, sequence=sequence
                 ))
                 info = parse_hello(response)
-                if info.application_version == target_version:
+                if (info.application_version == target_version and
+                        (required_state is None or
+                         info.update_state == required_state)):
                     return info
             except (TimeoutError, ProtocolError, OSError):
                 pass
@@ -270,14 +307,15 @@ def full_ota(link: SerialLink, data: bytes,
         # is that the new application comes back and identifies its version.
         print("INSTALL ACK not observed; waiting for updated application")
 
-    info = wait_for_application_version(link, target_version)
-    if info.update_state != UPDATE_IDLE:
-        raise ProtocolError(
-            f"updated application returned unexpected state={info.update_state}"
-        )
+    info = wait_for_application_version(
+        link,
+        target_version,
+        wait_seconds=35.0,
+        required_state=UPDATE_IDLE,
+    )
 
     print(
-        f"Full OTA PASS update_id=0x{update_id:08X} "
+        f"Full OTA + trial confirmation PASS update_id=0x{update_id:08X} "
         f"target_version=0x{target_version:08X} size={len(data)}"
     )
 

@@ -1,6 +1,6 @@
 # Memory Map Specification
 
-Status: **Phase 4 revision frozen**
+Status: **Base map frozen; Phase 8 defines a sublayout inside Backup Image**
 
 All addresses are inclusive unless stated otherwise.
 
@@ -53,14 +53,34 @@ Nominal size: 4 MiB, `0x000000`–`0x3FFFFF`.
 
 | Region | Start | End | Size | Purpose |
 |---|---:|---:|---:|---|
-| External Metadata A | `0x000000` | `0x000FFF` | 4 KiB | Phase-6 install handoff record A |
-| External Metadata B | `0x001000` | `0x001FFF` | 4 KiB | Phase-6 install handoff record B |
+| External Metadata A | `0x000000` | `0x000FFF` | 4 KiB | Install handoff A + Phase-7 download checkpoint A |
+| External Metadata B | `0x001000` | `0x001FFF` | 4 KiB | Install handoff B + Phase-7 download checkpoint B |
 | Incoming Artifact | `0x002000` | `0x021FFF` | 128 KiB | Full/delta secure container |
 | Reconstructed Image | `0x022000` | `0x041FFF` | 128 KiB | Reconstructed target image |
 | Backup Image | `0x042000` | `0x061FFF` | 128 KiB | Verified active-image backup |
 | Update Logs | `0x062000` | `0x071FFF` | 64 KiB | Bounded diagnostics |
-| Reserved | `0x072000` | `0x3FEFFF` | Remaining | Future use |\n| Phase 4 Self-test | `0x3FF000` | `0x3FFFFF` | 4 KiB | Destructive driver validation |
+| Reserved | `0x072000` | `0x3FEFFF` | Remaining | Future use |
+| Phase 4 Self-test | `0x3FF000` | `0x3FFFFF` | 4 KiB | Destructive driver validation |
 
 The Phase 4 driver and storage abstraction enforce these bounds. External metadata does not replace the two internal boot-critical records introduced in Phase 3.
 
-Phase 6 uses only the first 36 bytes of each 4 KiB external metadata sector for the A/B install handoff record. The rest remains reserved for future extended metadata.
+Phase 6/7 uses the first 36 bytes of each 4 KiB external metadata sector for
+the A/B install handoff record. Phase 7 additionally stores a 40-byte download
+checkpoint at sector offset `0x100`. Because either record update requires a
+whole-sector erase, the storage layer preserves the other valid record while
+rewriting its target A/B sector.
+
+
+### Phase 8 Backup Image sublayout
+
+The 128 KiB Backup Image partition keeps its frozen outer boundaries. Phase 8
+uses it as:
+
+| Subregion | Relative offset | Absolute start | Purpose |
+|---|---:|---:|---|
+| Backup header sector | `0x0000-0x0FFF` | `0x042000` | CRC-protected previous-version record |
+| Backup application bytes | `0x1000-0xA7FF` | `0x043000` | Exact 38 KiB internal application-region copy |
+| Unused backup capacity | remainder | after `0x04C7FF` | Reserved |
+
+The image begins on a separate erase sector so a torn header commit can be
+retried without erasing backup data.

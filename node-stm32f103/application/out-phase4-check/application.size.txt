@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+   4512	      8	   1576	   6096	   17d0	out-phase4-check/application.elf

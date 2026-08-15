@@ -1,13 +1,13 @@
 # Verification and Test Plan
 
-Status: Phase 0 baseline
+Status: Phase 7 recovery coverage added
 
 ## Required test categories
 
 ### Build and memory
 
 - bootloader binary remains within 24 KiB;
-- application remains within 39 KiB;
+- application remains within 38 KiB;
 - no linker section overlaps metadata;
 - external partitions are sector aligned and non-overlapping.
 
@@ -83,3 +83,26 @@ At least 100 automated update cycles with fault injection and no unrecoverable b
 - set a reset vector without the Thumb bit and confirm five-pulse rejection;
 - set a reset vector outside the application partition and confirm six-pulse
   rejection.
+
+
+## Phase 7 power-loss acceptance
+
+Host/model:
+
+- interrupt every byte position of a non-page-aligned internal install and
+  prove the final image converges byte-for-byte;
+- interrupt after a page verifies but before its metadata checkpoint commits;
+- interrupt external download progress at arbitrary offsets and prove recovery
+  resumes from the newest complete 4 KiB boundary;
+- interrupt an external A/B checkpoint write and prove the older valid record
+  remains selected.
+
+Hardware fault injection:
+
+- receive through byte 4608, reset STM32, expect QUERY/RESUME offset 4096;
+- retransmit from 4096 and complete FINISH;
+- issue INSTALL using a test-only bootloader that resets once at copy offset
+  1536 inside the second 1 KiB internal page;
+- prove application v2 boots;
+- prove final metadata is IDLE with active_version=2 and copy_offset=0;
+- restore the normal bootloader without overwriting application v2.

@@ -1,4 +1,4 @@
-# Phase 9 TODO: ESP-IDF project CMakeLists.txt
 cmake_minimum_required(VERSION 3.16)
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(secure_delta_ota_gateway)

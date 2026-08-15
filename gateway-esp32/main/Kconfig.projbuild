@@ -1,0 +1,33 @@
+menu "Secure Delta OTA Phase 9"
+
+config SDOTA_STM32_UART_NUM
+    int "STM32 UART controller"
+    range 1 2
+    default 2
+    help
+        UART0 is reserved for ESP-IDF console. UART2 is the default on ESP32.
+
+config SDOTA_STM32_UART_TX_GPIO
+    int "ESP32 TX GPIO -> STM32 PA10"
+    range 0 39
+    default 17
+
+config SDOTA_STM32_UART_RX_GPIO
+    int "ESP32 RX GPIO <- STM32 PA9"
+    range 0 39
+    default 16
+
+config SDOTA_PHASE9_AUTORUN
+    bool "Run embedded Phase-9 STM32 OTA test on boot"
+    default y
+
+config SDOTA_PHASE9_UPDATE_ID
+    hex "Phase-9 STM32 update ID"
+    default 0x90090001
+
+config SDOTA_PHASE9_TARGET_VERSION
+    int "Embedded STM32 candidate version"
+    range 1 4294967295
+    default 2
+
+endmenu

@@ -78,9 +78,18 @@ BootDecision_t BootDecision_Evaluate(const BootMetadata_t *metadata,
     }
 
     if ((application_valid == 0U) &&
-        ((decision.action == BOOT_ACTION_JUMP_ACTIVE) ||
-         (decision.action == BOOT_ACTION_RESUME_DOWNLOAD) ||
-         (decision.action == BOOT_ACTION_BOOT_TRIAL)))
+        (decision.action == BOOT_ACTION_BOOT_TRIAL))
+    {
+        /*
+         * A trial image with invalid vectors is never allowed to strand the
+         * product. Phase 8 restores the validated external backup instead.
+         */
+        decision.action = BOOT_ACTION_RESUME_ROLLBACK;
+        decision.reason = BOOT_DECISION_REASON_APPLICATION_INVALID;
+    }
+    else if ((application_valid == 0U) &&
+             ((decision.action == BOOT_ACTION_JUMP_ACTIVE) ||
+              (decision.action == BOOT_ACTION_RESUME_DOWNLOAD)))
     {
         decision.action = BOOT_ACTION_STAY_RECOVERY;
         decision.reason = BOOT_DECISION_REASON_APPLICATION_INVALID;

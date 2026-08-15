@@ -1,1 +1,12 @@
-# Phase 9+ defaults will be added after selecting the exact ESP32 board.
+# Phase 9 baseline: classic ESP32 DevKit / WROOM class board.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_MONITOR_BAUD_115200B=y
+
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_MAXIMUM_LEVEL_INFO=y
+
+# The Phase-9 gateway uses UART2 for the STM32 link and UART0 for console.

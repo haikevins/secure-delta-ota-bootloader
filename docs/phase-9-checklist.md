@@ -1,0 +1,32 @@
+# Phase 9 Checklist
+
+- [x] ESP-IDF project is buildable as `esp32`.
+- [x] UART2 default GPIO17 TX / GPIO16 RX.
+- [x] UART 115200 8-N-1.
+- [x] COBS + `0x00` framing.
+- [x] Packet CRC32 compatible with STM32/PC implementation.
+- [x] 256-byte DATA chunks.
+- [x] ACK/NACK parsing.
+- [x] 1500 ms timeout and five retries.
+- [x] HELLO/QUERY.
+- [x] START/DATA/FINISH.
+- [x] ABORT stale/foreign transfer.
+- [x] RESUME from STM32 authoritative offset.
+- [x] INSTALL.
+- [x] Lost INSTALL ACK tolerated through final-state observation.
+- [x] Wait through bootloader backup/install.
+- [x] Observe trial/final confirmed version.
+- [x] Detect rollback if old version returns after trial.
+- [x] ESP32 internal Flash artifact cache.
+- [x] Cache header CRC32.
+- [x] Cache artifact readback CRC32.
+- [x] Cache header published after artifact bytes.
+- [x] Healthy STM32 v2 candidate embedded for Phase-9 hardware test.
+- [x] Portable protocol host C tests.
+- [x] Resume/final-state Python model.
+- [x] `make phase9-check`.
+- [x] `make phase9-gateway-build`.
+- [x] `make phase9-hw-test ESP32_PORT=...`.
+- [ ] Physical ESP32↔STM32 hardware test confirmed by user.
+- [ ] HTTPS artifact download (Phase 10).
+- [ ] MQTT notification/status (Phase 11).

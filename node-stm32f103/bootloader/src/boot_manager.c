@@ -8,6 +8,7 @@
 #include "image_installer.h"
 #include "metadata_storage.h"
 #include "memory_map.h"
+#include "trial_boot.h"
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
@@ -24,6 +25,9 @@
 #define METADATA_ERROR_PULSES       8UL
 #define RECOVERY_ACTION_PULSES      9UL
 #define INSTALL_ERROR_PULSES        10UL
+#define TRIAL_ERROR_PULSES          11UL
+#define ROLLBACK_ERROR_PULSES       12UL
+#define MAX_BOOT_TRANSITIONS        8UL
 
 static volatile uint32_t g_boot_tick_ms;
 
@@ -127,18 +131,23 @@ static void BootManager_ShowFatalPulses(uint32_t pulse_count)
     }
 }
 
-static uint8_t BootManager_ActionCanJump(BootAction_t action)
-{
-    return (uint8_t)((action == BOOT_ACTION_JUMP_ACTIVE) ||
-                     (action == BOOT_ACTION_RESUME_DOWNLOAD) ||
-                     (action == BOOT_ACTION_BOOT_TRIAL));
-}
-
-static uint8_t BootManager_ActionNeedsBasicInstall(BootAction_t action)
+static uint8_t BootManager_ActionNeedsInstallWork(BootAction_t action)
 {
     return (uint8_t)((action == BOOT_ACTION_PROCESS_ARTIFACT) ||
+                     (action == BOOT_ACTION_CONTINUE_BACKUP) ||
                      (action == BOOT_ACTION_RESUME_INSTALL) ||
                      (action == BOOT_ACTION_VERIFY_INSTALL));
+}
+
+static void BootManager_RefreshApplication(
+    ApplicationVector_t *application_vector,
+    ApplicationValidationStatus_t *application_status,
+    uint8_t *application_valid)
+{
+    *application_status = ApplicationJump_Validate(APPLICATION_START_ADDRESS,
+                                                   application_vector);
+    *application_valid =
+        (uint8_t)(*application_status == APPLICATION_VALIDATION_OK);
 }
 
 void BootManager_Run(void)
@@ -151,7 +160,9 @@ void BootManager_Run(void)
     MetadataStorageStatus_t storage_status;
     BootDecision_t decision;
     ImageInstallerStatus_t installer_status;
+    TrialBootStatus_t trial_status;
     uint8_t application_valid;
+    uint32_t transitions;
 
     BootManager_LedInit();
 
@@ -172,8 +183,10 @@ void BootManager_Run(void)
         }
         else
         {
-            /* Metadata failure must not brick a previously valid product image
-             * during Phase 3. Use a finalized RAM default for this boot only. */
+            /*
+             * Retain the Phase-3 non-bricking fallback for a previously valid
+             * factory image if the very first metadata commit fails.
+             */
             metadata.generation = BOOT_METADATA_FIRST_GENERATION;
             BootMetadata_Finalize(&metadata);
         }
@@ -183,52 +196,115 @@ void BootManager_Run(void)
         BootManager_ShowFatalPulses(METADATA_ERROR_PULSES);
     }
 
-    application_status = ApplicationJump_Validate(APPLICATION_START_ADDRESS,
-                                                   &application_vector);
-    application_valid = (uint8_t)(application_status ==
-                                  APPLICATION_VALIDATION_OK);
+    BootManager_RefreshApplication(&application_vector,
+                                   &application_status,
+                                   &application_valid);
 
-    decision = BootDecision_Evaluate(&metadata, application_valid);
-
-    if (BootManager_ActionNeedsBasicInstall(decision.action) != 0U)
+    for (transitions = 0UL;
+         transitions < MAX_BOOT_TRANSITIONS;
+         ++transitions)
     {
-        installer_status = ImageInstaller_ProcessBasicFull(&metadata,
-                                                           &committed_metadata);
-        if ((installer_status == IMAGE_INSTALLER_OK) ||
-            (installer_status == IMAGE_INSTALLER_SOURCE_REJECTED))
-        {
-            metadata = committed_metadata;
-            application_status = ApplicationJump_Validate(
-                APPLICATION_START_ADDRESS, &application_vector);
-            application_valid = (uint8_t)(application_status ==
-                                          APPLICATION_VALIDATION_OK);
+        decision = BootDecision_Evaluate(&metadata, application_valid);
 
-            if ((metadata.state == (uint32_t)UPDATE_IDLE) &&
-                (application_valid != 0U))
+        if (BootManager_ActionNeedsInstallWork(decision.action) != 0U)
+        {
+            installer_status =
+                ImageInstaller_ProcessBasicFull(&metadata,
+                                                &committed_metadata);
+
+            if ((installer_status != IMAGE_INSTALLER_OK) &&
+                (installer_status != IMAGE_INSTALLER_SOURCE_REJECTED))
             {
-                BootManager_ShowStartupWindow();
-                ApplicationJump_Execute(&application_vector);
+                BootManager_ShowFatalPulses(INSTALL_ERROR_PULSES);
             }
+
+            metadata = committed_metadata;
+            BootManager_RefreshApplication(&application_vector,
+                                           &application_status,
+                                           &application_valid);
+            continue;
         }
 
-        BootManager_ShowFatalPulses(INSTALL_ERROR_PULSES);
+        if (decision.action == BOOT_ACTION_FINALIZE_CONFIRMATION)
+        {
+            trial_status =
+                TrialBoot_FinalizeConfirmation(&metadata,
+                                               &committed_metadata);
+            if (trial_status != TRIAL_BOOT_STATUS_OK)
+            {
+                BootManager_ShowFatalPulses(TRIAL_ERROR_PULSES);
+            }
+
+            metadata = committed_metadata;
+            BootManager_RefreshApplication(&application_vector,
+                                           &application_status,
+                                           &application_valid);
+            continue;
+        }
+
+        if (decision.action == BOOT_ACTION_RESUME_ROLLBACK)
+        {
+            installer_status =
+                ImageInstaller_ProcessRollback(&metadata,
+                                               &committed_metadata);
+            if (installer_status != IMAGE_INSTALLER_OK)
+            {
+                BootManager_ShowFatalPulses(ROLLBACK_ERROR_PULSES);
+            }
+
+            metadata = committed_metadata;
+            BootManager_RefreshApplication(&application_vector,
+                                           &application_status,
+                                           &application_valid);
+            continue;
+        }
+
+        if (decision.action == BOOT_ACTION_BOOT_TRIAL)
+        {
+            /*
+             * Increment and persist the attempt BEFORE jumping. A reset or
+             * power loss immediately after this commit therefore counts as a
+             * failed trial rather than creating an infinite boot loop.
+             */
+            trial_status = TrialBoot_PrepareAttempt(&metadata,
+                                                    &committed_metadata);
+            if (trial_status != TRIAL_BOOT_STATUS_OK)
+            {
+                BootManager_ShowFatalPulses(TRIAL_ERROR_PULSES);
+            }
+            metadata = committed_metadata;
+
+            BootManager_ShowStartupWindow();
+
+            /*
+             * IWDG is enabled only for a trial boot. The candidate must reach
+             * its health-confirmation path and reset back through the
+             * bootloader before the watchdog expires.
+             */
+            TrialBoot_StartWatchdog();
+            ApplicationJump_Execute(&application_vector);
+        }
+
+        if ((decision.action == BOOT_ACTION_JUMP_ACTIVE) ||
+            (decision.action == BOOT_ACTION_RESUME_DOWNLOAD))
+        {
+            BootManager_ShowStartupWindow();
+            ApplicationJump_Execute(&application_vector);
+        }
+
+        if ((application_valid == 0U) &&
+            (decision.reason == BOOT_DECISION_REASON_APPLICATION_INVALID))
+        {
+            BootManager_ShowFatalPulses(
+                BootManager_ApplicationErrorPulseCount(application_status));
+        }
+
+        /*
+         * Delta/secure-only states still deliberately remain in recovery until
+         * their later roadmap phases implement the owning action.
+         */
+        BootManager_ShowFatalPulses(RECOVERY_ACTION_PULSES);
     }
 
-    if (BootManager_ActionCanJump(decision.action) != 0U)
-    {
-        BootManager_ShowStartupWindow();
-        ApplicationJump_Execute(&application_vector);
-    }
-
-    if ((application_valid == 0U) &&
-        (decision.reason == BOOT_DECISION_REASON_APPLICATION_INVALID))
-    {
-        BootManager_ShowFatalPulses(
-            BootManager_ApplicationErrorPulseCount(application_status));
-    }
-
-    /* Update recovery actions are deliberately selected but not executed until
-     * their owning phases. Remaining in the bootloader is safer than silently
-     * jumping while an install/rollback state is pending. */
     BootManager_ShowFatalPulses(RECOVERY_ACTION_PULSES);
 }

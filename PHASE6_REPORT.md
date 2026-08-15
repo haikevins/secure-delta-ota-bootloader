@@ -47,7 +47,16 @@ python3 -m pip install -r tools/requirements-phase5.txt
 make phase6-hw-test PORT=/dev/ttyUSB0
 ```
 
-Hardware validation is intentionally left pending until run on the real board.
+Hardware validation: **PASS on the real board**.
+
+Observed end-to-end result:
+
+```text
+DATA 8444/8444 bytes
+Transfer PASS update_id=0x60060001 size=8444 crc32=0xE094DD88
+INSTALL ACK: PASS
+Full OTA PASS update_id=0x60060001 target_version=0x00000002 size=8444
+```
 
 
 ## Measured Clang/LLD build sizes

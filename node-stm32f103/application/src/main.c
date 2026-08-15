@@ -2,6 +2,7 @@
 #include "memory_map.h"
 #include "ota_agent.h"
 #include "phase4_flash_selftest.h"
+#include "trial_confirmation.h"
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
@@ -69,6 +70,10 @@ int main(void)
     }
 #else
     if (!OtaAgent_Init()) { Application_FatalBlink(); }
+    if (!TrialConfirmation_Init(g_application_tick_ms))
+    {
+        Application_FatalBlink();
+    }
 #endif
 
     for (;;)
@@ -76,6 +81,7 @@ int main(void)
         const uint32_t phase = g_application_tick_ms % HEARTBEAT_PERIOD_MS;
 #if !defined(PHASE4_HW_TEST)
         OtaAgent_Process();
+        TrialConfirmation_Process(g_application_tick_ms);
 #endif
         Application_LedSet((uint8_t)(phase < HEARTBEAT_ON_TIME_MS));
         __WFI();

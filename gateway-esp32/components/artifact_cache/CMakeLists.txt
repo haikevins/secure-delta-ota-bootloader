@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "artifact_cache.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        uart_ota
+    PRIV_REQUIRES
+        esp_partition
+)
