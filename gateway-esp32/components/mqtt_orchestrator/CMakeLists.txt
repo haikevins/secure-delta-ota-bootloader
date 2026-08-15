@@ -1,0 +1,11 @@
+idf_component_register(
+    SRCS
+        "mqtt_orchestration_contract.c"
+        "mqtt_orchestrator.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_REQUIRES
+        mqtt
+        cjson
+        mbedtls
+)

@@ -1,0 +1,46 @@
+{
+  "artifact_type": "delta",
+  "base_sha256": "38c1ea0538ec64d318d99bafefc68190c15c9605f9ff547eeb9f8f58991e8d42",
+  "base_size": 10180,
+  "base_vector": {
+    "msp": "0x20005000",
+    "reset": "0x08008729"
+  },
+  "base_version": 1,
+  "delta_eligible": true,
+  "operations": {
+    "bkt_ops": 0,
+    "count": 225,
+    "del_ops": 2,
+    "deleted_bytes": 4,
+    "eql_ops": 112,
+    "equal_bytes": 10062,
+    "ins_ops": 2,
+    "inserted_bytes": 8,
+    "mod_ops": 109,
+    "modified_bytes": 114
+  },
+  "patch_crc32": "0xFF298F67",
+  "patch_format": "jojodiff-compatible-v1",
+  "patch_ratio": 0.068637,
+  "patch_sha256": "e65f637e30b6e87977f1e4225884f203c2aaa7b936604d2b6af1e6b78393bae1",
+  "patch_size": 699,
+  "phase13_note": "STM32 delta application is intentionally not enabled until Phase 13.",
+  "savings_percent": 93.14,
+  "schema": 1,
+  "selection_threshold_percent": 20.0,
+  "target_crc32": "0x8A5C459C",
+  "target_load_address": "0x08006000",
+  "target_sha256": "f53d075e045484de16812a3e238ed683adfc6ce160e95d380343adc09d21be71",
+  "target_size": 10184,
+  "target_vector": {
+    "msp": "0x20005000",
+    "reset": "0x0800872D"
+  },
+  "target_version": 2,
+  "verification": {
+    "byte_for_byte_target_match": true,
+    "external_janpatch_checked": false,
+    "internal_roundtrip": true
+  }
+}

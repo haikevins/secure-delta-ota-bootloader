@@ -169,3 +169,27 @@ raw linker-produced `application.bin`; the START payload plus the external
 handoff record carries image size, target version and CRC32. Secure container
 parsing/signature verification is introduced in later phases without changing
 the internal application load address.
+
+
+## Phase 12 compatibility note
+
+Phase 12 now generates and host-verifies the delta payload format used by
+`FW_IMAGE_DELTA`.
+
+The generated payload is a JojoDiff-compatible stream and the Phase-12 JSON
+metadata records the exact values needed for later secure-container assembly:
+
+```text
+base_version
+target_version
+payload_size
+target_image_size
+target_load_address
+base_image_sha256
+target_image_sha256
+payload_crc32
+```
+
+Phase 12 does not yet serialize the final signed container header and does not
+claim authenticity. Container signing remains a later phase. STM32 patch
+application starts in Phase 13.

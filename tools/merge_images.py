@@ -36,11 +36,11 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "dist/secure-delta-ota-phase10.bin",
+        default=root / "dist/secure-delta-ota-phase11.bin",
     )
     parser.add_argument(
         "--label",
-        default="Phase 10",
+        default="Phase 11",
         help="manifest label only; does not change image layout",
     )
     args = parser.parse_args()

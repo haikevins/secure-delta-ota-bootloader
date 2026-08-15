@@ -1,0 +1,44 @@
+Phase 12 validation
+
+Run:
+
+  make phase12-check
+
+Expected:
+
+  Phase 12 JojoDiff-compatible generator property tests: PASS
+  PHASE12_DELTA=PASS base=v1 target=v2
+  PHASE12_ROUNDTRIP=PASS byte-for-byte
+  Phase 12 independent C JojoDiff-compatible reconstruction: PASS
+  Phase 12 deterministic generation: PASS
+  Secure Delta OTA Phase 12 delta generation check: PASS
+
+Optional third-party compatibility cross-check:
+
+  export JANPATCH_CLI=/path/to/janpatch-cli
+  make phase12-check
+
+Artifacts:
+
+  dist/phase12/application-v1-to-v2.jdiff
+  dist/phase12/application-v1-to-v2.json
+  dist/phase12/application-v1-to-v2-reconstructed.bin
+
+Phase boundary:
+
+  No STM32 delta patch application in Phase 12.
+  STM32 streaming patching begins in Phase 13.
+
+Packaged reference result:
+  Python JojoDiff property tests: PASS
+  Independent host C reconstruction: PASS
+  Repeat generation determinism: PASS
+  Python syntax validation: PASS
+  Structural/manifest validation: PASS
+  Base v1: 11876 bytes
+  Target v2: 11888 bytes
+  Patch: 1021 bytes
+  Savings: 91.41%
+  Patch CRC32: 0x84CB514A
+  Patch SHA256: 34d63a199aae161eca14fd1bdce42ea2736d390d0bdcc13511ac18f37d9b331c
+  Optional external JANPATCH_CLI: not bundled; checker supports it when supplied

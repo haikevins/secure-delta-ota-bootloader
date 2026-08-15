@@ -1,0 +1,40 @@
+# Phase 12 Checklist
+
+- [x] Host-only delta generation scope.
+- [x] Exact v1 base build.
+- [x] Exact v2 target build.
+- [x] JojoDiff-compatible operation stream.
+- [x] EQL generation.
+- [x] MOD generation.
+- [x] INS generation.
+- [x] DEL generation.
+- [x] BKT parser compatibility.
+- [x] Literal ESC escaping.
+- [x] JojoDiff/JANPatch length encoding.
+- [x] Length boundary tests.
+- [x] Deterministic `autojunk=False` matching.
+- [x] Deterministic patch bytes across repeated generation.
+- [x] Deterministic manifest across repeated generation.
+- [x] Base application vector validation.
+- [x] Target application vector validation.
+- [x] 38 KiB application limit enforcement.
+- [x] Base SHA-256.
+- [x] Target SHA-256.
+- [x] Patch SHA-256.
+- [x] Patch CRC32.
+- [x] Target CRC32.
+- [x] Configurable delta/full savings threshold.
+- [x] Default 20% minimum savings rule.
+- [x] Internal Python byte-for-byte reconstruction.
+- [x] Independent host C byte-for-byte reconstruction.
+- [x] Deterministic random mutation property tests.
+- [x] Optional external `JANPATCH_CLI` compatibility cross-check.
+- [x] JSON delta manifest.
+- [x] JSON manifest schema.
+- [x] `make phase12-base`.
+- [x] `make phase12-target`.
+- [x] `make phase12-delta`.
+- [x] `make phase12-check`.
+- [x] No STM32 patch application added prematurely.
+- [x] No firmware authenticity claim.
+- [ ] STM32 streaming patch adapter — Phase 13.

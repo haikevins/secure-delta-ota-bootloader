@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+  10176	      8	   1952	  12136	   2f68	out-phase12-target/application.elf

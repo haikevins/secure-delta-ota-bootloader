@@ -17,56 +17,51 @@ STM32 uses **Standard Peripheral Library + CMSIS**, not HAL. ESP32 uses
 - Phase 7 — Power-loss recovery: complete + hardware fault-injection verified.
 - Phase 8 — Trial boot and rollback: complete + hardware verified.
 - Phase 9 — ESP32 UART Gateway: complete + hardware verified.
-- Phase 10 — HTTPS download: implemented; hardware test provided.
+- Phase 10 — HTTPS download: complete + hardware verified.
+- Phase 11 — MQTT orchestration: complete + hardware verified.
+- Phase 12 — Delta patch generation: complete + host verified.
 
-## Phase 10 pipeline
+## Phase 11 pipeline
 
 ```text
-HTTPS server
-    |
-Wi-Fi + TLS
-    |
-ESP32 stm32_cache
-    |
-UART2
-    |
-STM32 USART1
-    |
-W25Q -> backup -> install -> trial -> confirm
+MQTTS broker
+   |
+   | update metadata / status / progress
+   v
+ESP32
+   |
+   | HTTPS firmware
+   v
+stm32_cache
+   |
+   | UART OTA
+   v
+STM32
+   |
+backup -> install -> trial -> confirm
 ```
 
-Production mode authenticates the HTTPS server and synchronizes time before
-TLS. The downloaded body is streamed directly into the ESP32 cache, verified,
-then handed to the already verified UART/STM32 pipeline.
+MQTT does not carry firmware bytes. The MQTT command names the HTTPS artifact
+and supplies expected size/CRC32. ESP32 verifies those fields after download
+before passing the artifact to STM32.
 
-## STM32 build
+## Host/build validation
 
 ```bash
-make phase10-check
-make combined
-make flash-combined
+make phase11-check
 ```
 
-Current STM32 combined image:
+## ESP32 build
 
-```text
-dist/secure-delta-ota-phase10.bin
-```
-
-## ESP32 production build
+ESP-IDF 6.x downloads the managed MQTT and cJSON components declared in
+`gateway-esp32/main/idf_component.yml`.
 
 ```bash
 source ~/esp/esp-idf/export.sh
-cd gateway-esp32
-idf.py set-target esp32
-idf.py menuconfig
-idf.py build
+make phase11-gateway-build
 ```
 
-Configure Wi-Fi and the HTTPS artifact URL under
-`Secure Delta OTA Phase 10`.
-
-## Phase 10 end-to-end hardware test
+## Phase 11 hardware test
 
 ```bash
 source ~/esp/esp-idf/export.sh
@@ -74,11 +69,16 @@ source ~/esp/esp-idf/export.sh
 export STM32_OPENOCD=/usr/bin/openocd
 export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
 
-make phase10-hw-test \
+make phase11-hw-test \
   ESP32_PORT=/dev/ttyUSB0 \
   WIFI_SSID="your-ssid" \
-  WIFI_PASSWORD="your-password"
+  WIFI_PASSWORD="your-password" \
+  PHASE11_HOST_IP=192.168.1.8
 ```
+
+The PC starts both a local TLS MQTT broker (`8883`) and TLS HTTPS firmware
+server (`8443`). If a host firewall is active, permit those ports from the
+local LAN.
 
 Default UART wiring:
 
@@ -90,6 +90,41 @@ ESP32 GND       -> STM32 GND
 
 See:
 
-- `docs/phase-10-https-download.md`
-- `docs/phase-10-checklist.md`
-- `PHASE10_REPORT.md`
+- `docs/phase-11-mqtt-orchestration.md`
+- `docs/phase-11-checklist.md`
+- `PHASE11_REPORT.md`
+
+
+## Phase 12 delta generation
+
+Phase 12 generates a JojoDiff-compatible delta from an exact application v1
+binary to application v2, reconstructs v2 on the host and validates the result
+byte-for-byte.
+
+```bash
+make phase12-check
+```
+
+Individual targets:
+
+```bash
+make phase12-base
+make phase12-target
+make phase12-delta
+```
+
+Artifacts:
+
+```text
+dist/phase12/application-v1-to-v2.jdiff
+dist/phase12/application-v1-to-v2.json
+dist/phase12/application-v1-to-v2-reconstructed.bin
+```
+
+Phase 12 is host-only. STM32 streaming delta application begins in Phase 13.
+
+See:
+
+- `docs/phase-12-delta-generation.md`
+- `docs/phase-12-checklist.md`
+- `PHASE12_REPORT.md`

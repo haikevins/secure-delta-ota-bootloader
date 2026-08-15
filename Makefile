@@ -6,11 +6,13 @@ TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
         phase8-check phase8-good-candidate phase8-bad-candidate phase8-hw-test \
         phase9-check phase9-candidate phase9-prepare-gateway phase9-gateway-build phase9-hw-test \
         phase10-check phase10-candidate phase10-gateway-build phase10-hw-test \
+        phase11-check phase11-candidate phase11-gateway-build phase11-hw-test \
+        phase12-check phase12-base phase12-target phase12-delta \
         bootloader application firmware combined \
         flash-bootloader flash-application flash-combined dump-metadata erase-metadata \
         gateway tools test release clean toolchain-info
 
-all: phase10-check
+all: phase12-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -156,6 +158,64 @@ phase10-hw-test:
 		python3 scripts/phase10_hw_test.py
 
 
+
+phase11-check:
+	@$(TOOLCHAIN_ARG) python3 scripts/phase11_check.py
+
+phase11-candidate:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase11-candidate OUT_DIR=out-phase11-candidate \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase11-candidate OUT_DIR=out-phase11-candidate \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" all
+
+phase11-gateway-build:
+	@command -v idf.py >/dev/null 2>&1 || { echo "idf.py not found. Source ESP-IDF export.sh first."; exit 1; }
+	@python3 scripts/esp32_build_guard.py
+	@cd gateway-esp32 && idf.py build
+
+phase11-hw-test:
+	@echo "Cleaning relocation-sensitive STM32 dependency/object files..."
+	@$(MAKE) -C node-stm32f103/bootloader $(TOOLCHAIN_ARG) clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) clean
+	@$(MAKE) bootloader application phase11-candidate combined
+	@ESP32_PORT="$(ESP32_PORT)" PORT="$(PORT)" \
+		WIFI_SSID="$(WIFI_SSID)" WIFI_PASSWORD="$(WIFI_PASSWORD)" \
+		PHASE11_HOST_IP="$(PHASE11_HOST_IP)" HTTPS_HOST_IP="$(HTTPS_HOST_IP)" \
+		HTTPS_PORT="$(HTTPS_PORT)" MQTT_PORT="$(MQTT_PORT)" \
+		python3 scripts/phase11_hw_test.py
+
+
+
+phase12-base:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase12-base OUT_DIR=out-phase12-base \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000001UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase12-base OUT_DIR=out-phase12-base \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000001UL" all
+
+phase12-target:
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase12-target OUT_DIR=out-phase12-target \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" clean
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-phase12-target OUT_DIR=out-phase12-target \
+		PROJECT_CFLAGS="-DAPPLICATION_VERSION=0x00000002UL" all
+
+phase12-delta: phase12-base phase12-target
+	@python3 tools/phase12_delta.py \
+		--base node-stm32f103/application/out-phase12-base/application.bin \
+		--target node-stm32f103/application/out-phase12-target/application.bin \
+		--base-version 1 --target-version 2 \
+		--output-dir dist/phase12 \
+		--min-savings-percent 20
+
+phase12-check:
+	@$(TOOLCHAIN_ARG) python3 scripts/phase12_check.py
+
+
 firmware: bootloader application
 
 bootloader:
@@ -166,8 +226,8 @@ application:
 
 combined: firmware
 	@python3 tools/merge_images.py \
-		--output dist/secure-delta-ota-phase10.bin \
-		--label "Phase 10"
+		--output dist/secure-delta-ota-phase11.bin \
+		--label "Phase 11"
 
 flash-bootloader:
 	@bash scripts/flash_bootloader.sh
@@ -187,12 +247,12 @@ erase-metadata:
 toolchain-info:
 	@$(MAKE) -C node-stm32f103/bootloader $(TOOLCHAIN_ARG) info
 
-gateway: phase10-gateway-build
+gateway: phase11-gateway-build
 
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase10-check
+test: phase12-check
 
 release:
 	@echo "Signed release pipeline is Phase 15."
@@ -212,6 +272,12 @@ clean:
 	@rm -rf node-stm32f103/application/out-phase9-candidate
 	@rm -rf node-stm32f103/application/build-phase10-candidate
 	@rm -rf node-stm32f103/application/out-phase10-candidate
+	@rm -rf node-stm32f103/application/build-phase11-candidate
+	@rm -rf node-stm32f103/application/out-phase11-candidate
+	@rm -rf node-stm32f103/application/build-phase12-base
+	@rm -rf node-stm32f103/application/out-phase12-base
+	@rm -rf node-stm32f103/application/build-phase12-target
+	@rm -rf node-stm32f103/application/out-phase12-target
 	@rm -rf node-stm32f103/bootloader/build-phase7-fault
 	@rm -rf node-stm32f103/bootloader/out-phase7-fault
 	@rm -rf gateway-esp32/build gateway-esp32/sdkconfig dist build-host

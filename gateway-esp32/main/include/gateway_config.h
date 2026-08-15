@@ -15,16 +15,23 @@ typedef struct
 
     const char *wifi_ssid;
     const char *wifi_password;
-    const char *https_url;
 
-    uint32_t update_id;
-    uint32_t target_version;
+    const char *mqtt_uri;
+    const char *mqtt_client_id;
+    const char *mqtt_topic_base;
+    const char *mqtt_device_id;
+    const char *mqtt_username;
+    const char *mqtt_password;
+
     uint32_t wifi_timeout_ms;
     uint32_t sntp_timeout_ms;
     uint32_t https_timeout_ms;
+    uint32_t mqtt_ready_timeout_ms;
+    uint32_t mqtt_command_timeout_ms;
 
     bool autorun;
     bool use_test_ca;
+    bool single_shot;
     int64_t test_epoch;
 } GatewayConfig_t;
 

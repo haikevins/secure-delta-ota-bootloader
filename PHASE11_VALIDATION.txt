@@ -1,0 +1,72 @@
+Phase 11 validation plan
+
+Host/build:
+  make phase11-check
+
+Production ESP-IDF build:
+  source ~/esp/esp-idf/export.sh
+  make phase11-gateway-build
+
+Hardware:
+  export STM32_OPENOCD=/usr/bin/openocd
+  export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+
+  make phase11-hw-test \
+    ESP32_PORT=/dev/ttyUSB0 \
+    WIFI_SSID="your-ssid" \
+    WIFI_PASSWORD="your-password" \
+    PHASE11_HOST_IP=192.168.1.8
+
+Expected MQTT broker transcript:
+  P11_BROKER_TLS=PASS
+  P11_BROKER_CONNECT=PASS
+  P11_BROKER_SUBSCRIBE=PASS
+  P11_BROKER_COMMAND_SENT=PASS
+  P11_BROKER_COMMAND_ACK=PASS
+  P11_BROKER_STATUS ... "state":"online"
+  P11_BROKER_STATUS ... "state":"accepted"
+  P11_BROKER_PROGRESS ... "stage":"https"
+  P11_BROKER_STATUS ... "state":"downloaded"
+  P11_BROKER_STATUS ... "state":"installing"
+  P11_BROKER_PROGRESS ... "stage":"uart"
+  P11_BROKER_STATUS ... "state":"confirmed"
+  P11_BROKER_CONFIRMED=PASS
+  P11_BROKER_RESULT=PASS
+
+Expected ESP32:
+  P11_MQTT=PASS
+  P11_COMMAND=PASS
+  P11_HTTPS=PASS
+  P11_FINAL=PASS
+  P11_STACK=PASS
+  P11_PIPELINE=PASS
+  P11_GATEWAY_HW_TEST=PASS
+
+Expected final:
+  P11_STM32_METADATA ... state=0 active_version=2 ...
+  STM32 MQTT-orchestrated candidate byte-for-byte verification: PASS
+  Local HTTPS server firmware GET: PASS
+  MQTT orchestration transcript verification: PASS
+  Phase 11 MQTT orchestration hardware test: PASS
+
+Packaging validation completed:
+  Phase 11 MQTT contract host C tests: PASS
+  Phase 11 fragmentation/orchestration model: PASS
+  Phase 10 HTTPS policy regression: PASS
+  Phase 10 transactional-cache model regression: PASS
+  Phase 9 UART protocol/model regression: PASS
+  ESP-IDF-specific Phase-11 C syntax/stub validation: PASS
+  Python syntax validation: PASS
+  STM32 bootloader build artifact: 11240 bytes
+  STM32 application v1 build artifact: 11876 bytes
+  STM32 candidate v2 build artifact: 11888 bytes
+  STM32 candidate CRC32: 0x02904AA9
+  STM32 combined Phase 11 image: 36452 bytes
+  Real ESP-IDF build in packaging environment: SKIPPED (idf.py unavailable)
+  Physical Phase-11 hardware validation: PENDING USER BOARD TEST
+  Kconfig bool=n compile regression: PASS
+  Kconfig bool=y compile regression: PASS
+  Direct CONFIG_* bool-expression regression guard: PASS
+  QoS-0 immediate progress publish regression: PASS
+  QoS-1 final PUBACK wait regression: PASS
+  Single-shot MQTT drain ordering regression: PASS

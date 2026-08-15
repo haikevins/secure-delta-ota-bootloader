@@ -1,4 +1,4 @@
-Secure Delta OTA Phase 10 combined image
+Secure Delta OTA Phase 11 combined image
 flash_base=0x08000000
 bootloader_size=11240
 application_address=0x08006000

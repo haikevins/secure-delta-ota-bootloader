@@ -11,7 +11,8 @@ idf_component_register(
         wifi_station
         https_download
         time_sync
+        mqtt_orchestrator
         esp_timer
     EMBED_TXTFILES
-        "phase10_test_ca.pem"
+        "phase11_test_ca.pem"
 )

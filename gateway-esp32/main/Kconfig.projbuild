@@ -1,4 +1,4 @@
-menu "Secure Delta OTA Phase 10"
+menu "Secure Delta OTA Phase 11"
 
 config SDOTA_STM32_UART_NUM
     int "STM32 UART controller"
@@ -17,19 +17,23 @@ config SDOTA_STM32_UART_RX_GPIO
     range 0 39
     default 16
 
-
-config SDOTA_PHASE10_GATEWAY_TASK_STACK_SIZE
-    int "Phase-10 gateway worker task stack size (bytes)"
+config SDOTA_PHASE11_GATEWAY_TASK_STACK_SIZE
+    int "Phase-11 gateway worker task stack size (bytes)"
     range 8192 32768
     default 16384
     help
-        Stack for the dedicated Phase-10 Wi-Fi/TLS/HTTPS/UART worker task.
-        The complete HTTPS pipeline is intentionally not run on app_main's
-        system main task.
+        Stack for the dedicated MQTT orchestration + HTTPS + UART OTA worker.
 
-config SDOTA_PHASE10_AUTORUN
-    bool "Run Phase-10 HTTPS -> STM32 OTA flow on boot"
+config SDOTA_PHASE11_AUTORUN
+    bool "Run Phase-11 MQTT orchestration on boot"
     default y
+
+config SDOTA_PHASE11_SINGLE_SHOT
+    bool "Process one MQTT update command then report PASS"
+    default n
+    help
+        Intended mainly for deterministic hardware tests. Production normally
+        keeps this disabled so the gateway waits for future MQTT commands.
 
 config SDOTA_WIFI_SSID
     string "Wi-Fi SSID"
@@ -39,18 +43,31 @@ config SDOTA_WIFI_PASSWORD
     string "Wi-Fi password"
     default ""
 
-config SDOTA_HTTPS_URL
-    string "HTTPS URL of raw STM32 application binary"
+config SDOTA_MQTT_URI
+    string "MQTT broker URI"
+    default ""
+    help
+        Production Phase 11 requires mqtts:// with server verification.
+
+config SDOTA_MQTT_CLIENT_ID
+    string "MQTT client ID"
+    default "sdota-bluepill-001"
+
+config SDOTA_MQTT_TOPIC_BASE
+    string "MQTT topic base"
+    default "sdota"
+
+config SDOTA_MQTT_DEVICE_ID
+    string "MQTT device ID"
+    default "bluepill-001"
+
+config SDOTA_MQTT_USERNAME
+    string "MQTT username (optional)"
     default ""
 
-config SDOTA_PHASE10_UPDATE_ID
-    hex "Phase-10 STM32 update ID"
-    default 0xA00A0001
-
-config SDOTA_PHASE10_TARGET_VERSION
-    int "Downloaded STM32 target version"
-    range 1 4294967295
-    default 2
+config SDOTA_MQTT_PASSWORD
+    string "MQTT password (optional)"
+    default ""
 
 config SDOTA_WIFI_TIMEOUT_MS
     int "Wi-Fi connection timeout (ms)"
@@ -66,5 +83,15 @@ config SDOTA_HTTPS_TIMEOUT_MS
     int "HTTPS inactivity/connection timeout (ms)"
     range 1000 120000
     default 15000
+
+config SDOTA_MQTT_READY_TIMEOUT_MS
+    int "MQTT connect + subscribe timeout (ms)"
+    range 1000 120000
+    default 30000
+
+config SDOTA_MQTT_COMMAND_TIMEOUT_MS
+    int "Single-shot MQTT command timeout (ms; 0 waits forever)"
+    range 0 600000
+    default 0
 
 endmenu
