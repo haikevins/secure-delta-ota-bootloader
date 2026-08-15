@@ -8,7 +8,10 @@ idf_component_register(
     PRIV_REQUIRES
         uart_ota
         artifact_cache
+        wifi_station
+        https_download
+        time_sync
         esp_timer
-    EMBED_FILES
-        "phase9_candidate.bin"
+    EMBED_TXTFILES
+        "phase10_test_ca.pem"
 )

@@ -7,8 +7,10 @@
 
 #include "uart_ota_protocol.h"
 
+#define ARTIFACT_CACHE_ERASE_SIZE 4096UL
+
 _Static_assert(sizeof(ArtifactCacheHeader_t) == 36U,
-               "Phase-9 cache header layout changed");
+               "artifact cache header layout changed");
 _Static_assert(offsetof(ArtifactCacheHeader_t, header_crc32) == 32U,
                "cache CRC must be final word");
 
@@ -24,6 +26,24 @@ static uint32_t HeaderCrc(const ArtifactCacheHeader_t *header)
     return UartOta_Crc32(
         header,
         offsetof(ArtifactCacheHeader_t, header_crc32));
+}
+
+static uint32_t CrcUpdate(uint32_t running,
+                          const uint8_t *data,
+                          size_t length)
+{
+    for (size_t i = 0U; i < length; ++i)
+    {
+        running ^= data[i];
+        for (uint32_t bit = 0UL; bit < 8UL; ++bit)
+        {
+            const uint32_t mask =
+                (uint32_t)(0UL - (running & 1UL));
+            running = (running >> 1U) ^
+                      (0xEDB88320UL & mask);
+        }
+    }
+    return running;
 }
 
 static bool HeaderValid(const esp_partition_t *partition,
@@ -58,10 +78,11 @@ static esp_err_t CalculateStoredImageCrc(const esp_partition_t *partition,
     uint32_t offset = 0UL;
     uint32_t running = 0xFFFFFFFFUL;
 
-    /*
-     * UartOta_Crc32 is one-shot, so use the same IEEE recurrence here for
-     * streaming reads from partition without allocating the whole artifact.
-     */
+    if ((partition == NULL) || (crc_out == NULL))
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     while (offset < image_size)
     {
         size_t chunk = image_size - offset;
@@ -70,7 +91,7 @@ static esp_err_t CalculateStoredImageCrc(const esp_partition_t *partition,
             chunk = sizeof(buffer);
         }
 
-        esp_err_t status = esp_partition_read(
+        const esp_err_t status = esp_partition_read(
             partition,
             ARTIFACT_CACHE_DATA_OFFSET + offset,
             buffer,
@@ -80,18 +101,7 @@ static esp_err_t CalculateStoredImageCrc(const esp_partition_t *partition,
             return status;
         }
 
-        for (size_t i = 0U; i < chunk; ++i)
-        {
-            running ^= buffer[i];
-            for (uint32_t bit = 0UL; bit < 8UL; ++bit)
-            {
-                const uint32_t mask =
-                    (uint32_t)(0UL - (running & 1UL));
-                running = (running >> 1U) ^
-                          (0xEDB88320UL & mask);
-            }
-        }
-
+        running = CrcUpdate(running, buffer, chunk);
         offset += (uint32_t)chunk;
     }
 
@@ -149,21 +159,17 @@ esp_err_t ArtifactCache_Open(ArtifactCache_t *cache)
     return ESP_OK;
 }
 
-esp_err_t ArtifactCache_Seed(ArtifactCache_t *cache,
-                             const uint8_t *image,
-                             size_t image_size,
-                             uint32_t update_id,
-                             uint32_t target_version)
+esp_err_t ArtifactCache_BeginWrite(ArtifactCacheWriter_t *writer,
+                                   uint32_t expected_size,
+                                   uint32_t update_id,
+                                   uint32_t target_version)
 {
     const esp_partition_t *partition;
-    ArtifactCacheHeader_t header;
     size_t erase_size;
-    uint32_t stored_crc = 0UL;
     esp_err_t status;
 
-    if ((cache == NULL) || (image == NULL) ||
-        (image_size == 0U) || (update_id == 0UL) ||
-        (target_version == 0UL))
+    if ((writer == NULL) || (expected_size == 0UL) ||
+        (update_id == 0UL) || (target_version == 0UL))
     {
         return ESP_ERR_INVALID_ARG;
     }
@@ -174,44 +180,142 @@ esp_err_t ArtifactCache_Seed(ArtifactCache_t *cache,
         return ESP_ERR_NOT_FOUND;
     }
 
-    if (image_size > (partition->size - ARTIFACT_CACHE_DATA_OFFSET))
+    if (expected_size >
+        (partition->size - ARTIFACT_CACHE_DATA_OFFSET))
     {
         return ESP_ERR_INVALID_SIZE;
     }
 
+    memset(writer, 0, sizeof(*writer));
+    writer->partition = partition;
+    writer->update_id = update_id;
+    writer->target_version = target_version;
+    writer->expected_size = expected_size;
+    writer->running_crc32 = 0xFFFFFFFFUL;
+
     /*
-     * Erase data range and write image FIRST. Header sector is written last.
-     * A power loss before the final header therefore cannot publish a partial
-     * artifact as valid.
+     * Invalidate the old published header before touching data. A power cut
+     * after this point can leave bytes in the data area, but ArtifactCache_Open
+     * cannot accept them until a new verified header is committed.
      */
-    erase_size = (image_size + 4095U) & ~(size_t)4095U;
-    status = esp_partition_erase_range(
+    status = esp_partition_erase_range(partition,
+                                       0UL,
+                                       ARTIFACT_CACHE_ERASE_SIZE);
+    if (status != ESP_OK)
+    {
+        return status;
+    }
+
+    erase_size =
+        ((size_t)expected_size + ARTIFACT_CACHE_ERASE_SIZE - 1U) &
+        ~((size_t)ARTIFACT_CACHE_ERASE_SIZE - 1U);
+
+    status = esp_partition_erase_range(partition,
+                                       ARTIFACT_CACHE_DATA_OFFSET,
+                                       erase_size);
+    if (status != ESP_OK)
+    {
+        return status;
+    }
+
+    writer->active = true;
+    return ESP_OK;
+}
+
+esp_err_t ArtifactCache_Write(ArtifactCacheWriter_t *writer,
+                              const uint8_t *data,
+                              size_t length)
+{
+    const esp_partition_t *partition;
+    esp_err_t status;
+
+    if ((writer == NULL) ||
+        ((data == NULL) && (length != 0U)))
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!writer->active)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (length >
+        ((size_t)writer->expected_size - writer->written_size))
+    {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    if (length == 0U)
+    {
+        return ESP_OK;
+    }
+
+    partition = (const esp_partition_t *)writer->partition;
+    if (partition == NULL)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    status = esp_partition_write(
         partition,
-        ARTIFACT_CACHE_DATA_OFFSET,
-        erase_size);
+        ARTIFACT_CACHE_DATA_OFFSET + writer->written_size,
+        data,
+        length);
     if (status != ESP_OK)
     {
         return status;
     }
 
-    status = esp_partition_write(partition,
-                                 ARTIFACT_CACHE_DATA_OFFSET,
-                                 image,
-                                 image_size);
-    if (status != ESP_OK)
+    writer->running_crc32 =
+        CrcUpdate(writer->running_crc32, data, length);
+    writer->written_size += (uint32_t)length;
+    return ESP_OK;
+}
+
+esp_err_t ArtifactCache_Commit(ArtifactCacheWriter_t *writer,
+                               ArtifactCache_t *cache)
+{
+    const esp_partition_t *partition;
+    ArtifactCacheHeader_t header;
+    uint32_t stored_crc = 0UL;
+    uint32_t streamed_crc;
+    esp_err_t status;
+
+    if ((writer == NULL) || (cache == NULL))
     {
-        return status;
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!writer->active)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (writer->written_size != writer->expected_size)
+    {
+        return ESP_ERR_INVALID_SIZE;
     }
 
+    partition = (const esp_partition_t *)writer->partition;
+    if (partition == NULL)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    streamed_crc = writer->running_crc32 ^ 0xFFFFFFFFUL;
+
+    /*
+     * Read the complete stored artifact back before publishing its header.
+     * This catches an interrupted/failed flash write without retaining the
+     * whole HTTPS payload in RAM.
+     */
     status = CalculateStoredImageCrc(partition,
-                                     (uint32_t)image_size,
+                                     writer->expected_size,
                                      &stored_crc);
     if (status != ESP_OK)
     {
         return status;
     }
-
-    if (stored_crc != UartOta_Crc32(image, image_size))
+    if (stored_crc != streamed_crc)
     {
         return ESP_ERR_INVALID_CRC;
     }
@@ -220,18 +324,12 @@ esp_err_t ArtifactCache_Seed(ArtifactCache_t *cache,
     header.magic = ARTIFACT_CACHE_MAGIC;
     header.format_version = ARTIFACT_CACHE_FORMAT_VERSION;
     header.header_size = sizeof(header);
-    header.update_id = update_id;
-    header.target_version = target_version;
-    header.image_size = (uint32_t)image_size;
+    header.update_id = writer->update_id;
+    header.target_version = writer->target_version;
+    header.image_size = writer->expected_size;
     header.image_crc32 = stored_crc;
     header.data_offset = ARTIFACT_CACHE_DATA_OFFSET;
     header.header_crc32 = HeaderCrc(&header);
-
-    status = esp_partition_erase_range(partition, 0UL, 4096U);
-    if (status != ESP_OK)
-    {
-        return status;
-    }
 
     status = esp_partition_write(partition,
                                  0UL,
@@ -242,7 +340,83 @@ esp_err_t ArtifactCache_Seed(ArtifactCache_t *cache,
         return status;
     }
 
-    return ArtifactCache_Open(cache);
+    status = ArtifactCache_Open(cache);
+    if (status != ESP_OK)
+    {
+        /*
+         * A header that cannot pass the final open/readback validation must
+         * never remain published.
+         */
+        (void)esp_partition_erase_range(
+            partition, 0UL, ARTIFACT_CACHE_ERASE_SIZE);
+        writer->active = false;
+        return status;
+    }
+
+    writer->active = false;
+    return ESP_OK;
+}
+
+esp_err_t ArtifactCache_Abort(ArtifactCacheWriter_t *writer)
+{
+    const esp_partition_t *partition;
+    esp_err_t status = ESP_OK;
+
+    if (writer == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    partition = (const esp_partition_t *)writer->partition;
+
+    if ((partition != NULL) && writer->active)
+    {
+        status = esp_partition_erase_range(
+            partition, 0UL, ARTIFACT_CACHE_ERASE_SIZE);
+    }
+
+    writer->active = false;
+    return status;
+}
+
+esp_err_t ArtifactCache_Seed(ArtifactCache_t *cache,
+                             const uint8_t *image,
+                             size_t image_size,
+                             uint32_t update_id,
+                             uint32_t target_version)
+{
+    ArtifactCacheWriter_t writer;
+    esp_err_t status;
+
+    if ((cache == NULL) || (image == NULL) ||
+        (image_size == 0U) ||
+        (image_size > UINT32_MAX))
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    status = ArtifactCache_BeginWrite(&writer,
+                                      (uint32_t)image_size,
+                                      update_id,
+                                      target_version);
+    if (status != ESP_OK)
+    {
+        return status;
+    }
+
+    status = ArtifactCache_Write(&writer, image, image_size);
+    if (status != ESP_OK)
+    {
+        (void)ArtifactCache_Abort(&writer);
+        return status;
+    }
+
+    status = ArtifactCache_Commit(&writer, cache);
+    if (status != ESP_OK)
+    {
+        (void)ArtifactCache_Abort(&writer);
+    }
+    return status;
 }
 
 esp_err_t ArtifactCache_Read(void *context,

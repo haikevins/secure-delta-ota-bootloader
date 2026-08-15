@@ -288,7 +288,7 @@ def main() -> None:
     # If an ESP-IDF environment is active, validate the real gateway build too.
     idf = shutil.which("idf.py")
     if idf and os.environ.get("IDF_PATH"):
-        run([idf, "set-target", "esp32"], cwd=GATEWAY, timeout=180)
+        run(["python3", "scripts/esp32_build_guard.py"])
         run([idf, "build"], cwd=GATEWAY, timeout=300)
         print("ESP-IDF gateway build: PASS")
     else:

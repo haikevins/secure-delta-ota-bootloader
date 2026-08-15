@@ -1,15 +1,21 @@
-# artifact_cache — Phase 9
+# artifact_cache — Phase 10
 
-Phase 9 implements a power-cut-safe cache in ESP32 internal SPI flash using the
-custom `stm32_cache` data partition.
+The ESP32 `stm32_cache` partition remains the persistent source consumed by
+the UART gateway.
 
-Write order:
+Phase 10 adds a transactional streaming writer for HTTPS:
 
-1. erase/write candidate bytes at partition offset `0x1000`;
-2. read back and CRC32 the stored bytes;
-3. erase header sector;
-4. write CRC-protected cache header last.
+```text
+invalidate header
+erase data range
+stream sequential bytes
+streaming CRC32
+full stored-image readback CRC32
+publish header last
+```
 
-The UART gateway consumes the artifact only through an offset-based read
-callback. Phase 10 can therefore replace the Phase-9 embedded seed with HTTPS
-download without changing the UART protocol component.
+A reset or power loss before the final header commit leaves no valid cache
+record. `ArtifactCache_Open()` also recomputes the complete stored image CRC
+before exposing an artifact to the UART layer.
+
+The persistent header format remains compatible with Phase 9.

@@ -1,0 +1,35 @@
+# Phase 10 Checklist
+
+- [x] Wi-Fi station initialization.
+- [x] Wait for DHCP/IP before network use.
+- [x] Wi-Fi reconnect attempts and timeout.
+- [x] Production SNTP synchronization before TLS.
+- [x] HTTPS-only URL policy.
+- [x] TLS server verification is mandatory.
+- [x] ESP x509 certificate bundle in production.
+- [x] HTTP status 200 required.
+- [x] `Content-Length` required.
+- [x] Chunked response rejected in Phase 10.
+- [x] 38 KiB maximum raw application size.
+- [x] HTTPS body streamed without whole-image RAM buffering.
+- [x] Cache header invalidated before download.
+- [x] Sequential partition writes.
+- [x] Streaming CRC32.
+- [x] Full stored-image readback CRC32.
+- [x] Cache header committed last.
+- [x] Incomplete HTTPS response leaves no valid cache.
+- [x] Existing Phase-9 UART transfer reused after HTTPS commit.
+- [x] Trial/confirm final-state observation retained.
+- [x] Portable HTTPS response-policy C tests.
+- [x] Transactional-cache host model.
+- [x] Local Python HTTPS firmware server.
+- [x] Temporary hardware-test CA/server certificate generation.
+- [x] Certificate IP SAN matches selected PC LAN IPv4 address.
+- [x] Phase-10 test epoch limited to private test-CA mode.
+- [x] STM32/ESP32 OpenOCD isolation retained.
+- [x] Relocatable build-tree cleanup retained.
+- [x] `make phase10-check`.
+- [x] `make phase10-gateway-build`.
+- [x] `make phase10-hw-test ...`.
+- [ ] Physical HTTPS -> ESP32 -> STM32 hardware test confirmed by user.
+- [ ] MQTT notification/status (Phase 11).

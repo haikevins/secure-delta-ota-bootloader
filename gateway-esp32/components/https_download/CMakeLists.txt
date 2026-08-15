@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS
+        "https_download.c"
+        "https_download_policy.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        artifact_cache
+    PRIV_REQUIRES
+        esp_http_client
+        esp_timer
+        mbedtls
+)

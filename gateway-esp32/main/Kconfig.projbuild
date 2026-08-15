@@ -1,4 +1,4 @@
-menu "Secure Delta OTA Phase 9"
+menu "Secure Delta OTA Phase 10"
 
 config SDOTA_STM32_UART_NUM
     int "STM32 UART controller"
@@ -17,17 +17,54 @@ config SDOTA_STM32_UART_RX_GPIO
     range 0 39
     default 16
 
-config SDOTA_PHASE9_AUTORUN
-    bool "Run embedded Phase-9 STM32 OTA test on boot"
+
+config SDOTA_PHASE10_GATEWAY_TASK_STACK_SIZE
+    int "Phase-10 gateway worker task stack size (bytes)"
+    range 8192 32768
+    default 16384
+    help
+        Stack for the dedicated Phase-10 Wi-Fi/TLS/HTTPS/UART worker task.
+        The complete HTTPS pipeline is intentionally not run on app_main's
+        system main task.
+
+config SDOTA_PHASE10_AUTORUN
+    bool "Run Phase-10 HTTPS -> STM32 OTA flow on boot"
     default y
 
-config SDOTA_PHASE9_UPDATE_ID
-    hex "Phase-9 STM32 update ID"
-    default 0x90090001
+config SDOTA_WIFI_SSID
+    string "Wi-Fi SSID"
+    default ""
 
-config SDOTA_PHASE9_TARGET_VERSION
-    int "Embedded STM32 candidate version"
+config SDOTA_WIFI_PASSWORD
+    string "Wi-Fi password"
+    default ""
+
+config SDOTA_HTTPS_URL
+    string "HTTPS URL of raw STM32 application binary"
+    default ""
+
+config SDOTA_PHASE10_UPDATE_ID
+    hex "Phase-10 STM32 update ID"
+    default 0xA00A0001
+
+config SDOTA_PHASE10_TARGET_VERSION
+    int "Downloaded STM32 target version"
     range 1 4294967295
     default 2
+
+config SDOTA_WIFI_TIMEOUT_MS
+    int "Wi-Fi connection timeout (ms)"
+    range 1000 120000
+    default 30000
+
+config SDOTA_SNTP_TIMEOUT_MS
+    int "SNTP synchronization timeout (ms)"
+    range 1000 120000
+    default 20000
+
+config SDOTA_HTTPS_TIMEOUT_MS
+    int "HTTPS inactivity/connection timeout (ms)"
+    range 1000 120000
+    default 15000
 
 endmenu
