@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "memory_map.h"
+#include "phase4_flash_selftest.h"
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
@@ -79,6 +80,14 @@ int main(void)
     {
         Application_FatalBlink();
     }
+
+#if defined(PHASE4_HW_TEST)
+    Phase4FlashSelfTest_Run();
+    if (g_phase4_flash_test_status != PHASE4_FLASH_TEST_PASS)
+    {
+        Application_FatalBlink();
+    }
+#endif
 
     for (;;)
     {

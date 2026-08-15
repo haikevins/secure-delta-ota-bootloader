@@ -106,15 +106,22 @@ def binary_size(path: Path) -> int:
 
 def verify_unique_basenames(image: str) -> None:
     project = ROOT / "node-stm32f103" / image
-    selected = [project / "src/main.c", project / "platform/system_clock.c"]
-    selected.extend(
-        [
-            ROOT / "node-stm32f103/spl/src/misc.c",
-            ROOT / "node-stm32f103/spl/src/stm32f10x_gpio.c",
-            ROOT / "node-stm32f103/spl/src/stm32f10x_rcc.c",
-        ]
+    result = subprocess.run(
+        ["make", "-s", "list-sources"],
+        cwd=project,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=os.environ.copy(),
     )
-    names = [path.name for path in selected]
+    if result.returncode != 0:
+        print(result.stdout, end="")
+        fail(f"cannot enumerate selected sources for {image}")
+
+    paths = [line.strip() for line in result.stdout.splitlines()
+             if line.strip().endswith((".c", ".s"))]
+    names = [Path(path).name for path in paths]
     duplicates = sorted({name for name in names if names.count(name) > 1})
     if duplicates:
         fail(f"flat object naming collision in {image}: {', '.join(duplicates)}")

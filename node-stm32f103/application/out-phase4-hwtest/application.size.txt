@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+   3684	      8	   1048	   4740	   1284	out-phase4-hwtest/application.elf

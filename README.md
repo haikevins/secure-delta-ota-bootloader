@@ -8,7 +8,7 @@ Secure Delta OTA reference project for **STM32F103C8T6 + ESP32 + external SPI NO
 - **Phase 1 — Repository and Build Foundation:** complete.
 - **Phase 2 — Bootloader Jump to Application:** complete.
 - **Phase 3 — Metadata and Boot Decision:** complete.
-- **Phase 4 — External SPI Flash:** not implemented yet.
+- **Phase 4 — External SPI Flash:** implemented; hardware test provided.
 
 STM32 code uses **SPL/CMSIS**, not HAL.
 
@@ -36,17 +36,17 @@ Map persisted update state to explicit boot action
         +-- later-phase recovery action --> remain in bootloader (9 pulses)
 ```
 
-## Build and verify Phase 3
+## Build and verify Phase 4
 
 ```bash
-make phase3-check
+make phase4-check
 ```
 
 Explicit toolchain selection remains supported:
 
 ```bash
-make phase3-check TOOLCHAIN=gcc
-make phase3-check TOOLCHAIN=clang
+make phase4-check TOOLCHAIN=gcc
+make phase4-check TOOLCHAIN=clang
 ```
 
 Useful targets:
@@ -58,6 +58,7 @@ make combined
 make flash-combined
 make dump-metadata
 make erase-metadata
+make phase4-hw-test
 make test
 make clean
 ```
@@ -65,8 +66,8 @@ make clean
 `make combined` creates:
 
 ```text
-dist/secure-delta-ota-phase3.bin
-dist/secure-delta-ota-phase3.txt
+dist/secure-delta-ota-phase4.bin
+dist/secure-delta-ota-phase4.txt
 ```
 
 The combined image does not contain metadata bytes. On a fresh/erased device, first boot initializes slot A and then jumps to the application. Use `make erase-metadata` when you intentionally need a clean Phase 3 metadata test; normal combined flashing preserves existing metadata. Use `make dump-metadata` to read and decode both pages.
@@ -103,3 +104,28 @@ shows nine pulses repeatedly.
 - `PHASE3_REPORT.md`
 
 The complete specification remains under `docs/`.
+
+
+## Phase 4 external SPI Flash
+
+Common implementation:
+
+- `node-stm32f103/common/drivers/spi_flash.c`
+- `node-stm32f103/common/storage/external_flash_storage.c`
+
+Pins: PA5 SCK, PA6 MISO, PA7 MOSI, PB0 CS. The hardware self-test uses only
+external sector `0x3FF000-0x3FFFFF`.
+
+```bash
+make phase4-check
+make phase4-hw-test
+```
+
+The hardware runner retries normal SWD, slow SWD and connect-under-reset.
+For the final recovery mode, connect **ST-LINK NRST to STM32 NRST**.
+
+## Phase 4 documents
+
+- `docs/external-spi-flash.md`
+- `docs/phase-4-checklist.md`
+- `PHASE4_REPORT.md`

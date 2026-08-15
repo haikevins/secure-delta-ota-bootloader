@@ -1,6 +1,6 @@
 # Memory Map Specification
 
-Status: **Phase 3 revision frozen**
+Status: **Phase 4 revision frozen**
 
 All addresses are inclusive unless stated otherwise.
 
@@ -58,7 +58,6 @@ Nominal size: 4 MiB, `0x000000`–`0x3FFFFF`.
 | Reconstructed Image | `0x022000` | `0x041FFF` | 128 KiB | Reconstructed target image |
 | Backup Image | `0x042000` | `0x061FFF` | 128 KiB | Verified active-image backup |
 | Update Logs | `0x062000` | `0x071FFF` | 64 KiB | Bounded diagnostics |
-| Reserved | `0x072000` | `0x3FFFFF` | Remaining | Future use |
+| Reserved | `0x072000` | `0x3FEFFF` | Remaining | Future use |\n| Phase 4 Self-test | `0x3FF000` | `0x3FFFFF` | 4 KiB | Destructive driver validation |
 
-The W25Q32 driver begins in Phase 4. External metadata does not replace the two
-internal boot-critical records introduced in Phase 3.
+The Phase 4 driver and storage abstraction enforce these bounds. External metadata does not replace the two internal boot-critical records introduced in Phase 3.

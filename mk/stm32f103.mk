@@ -19,6 +19,7 @@ CMSIS_CORE_DIR := $(CMSIS_DIR)/CM3/CoreSupport
 CMSIS_DEV_DIR  := $(CMSIS_DIR)/CM3/DeviceSupport/ST/STM32F10x
 CONFIG_DIR     := $(NODE_DIR)/config
 SHARED_DIR     := $(ROOT_DIR)/shared
+NODE_COMMON_DIR := $(NODE_DIR)/common
 
 BUILD_DIR ?= build
 OUT_DIR   ?= out
@@ -65,6 +66,7 @@ INCLUDE_DIRS := \
   $(CMSIS_CORE_DIR) \
   $(CMSIS_DEV_DIR) \
   $(SHARED_DIR)/include \
+  $(NODE_COMMON_DIR)/include \
   include \
   crypto \
   patch

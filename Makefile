@@ -1,9 +1,9 @@
 TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
 
-.PHONY: all phase0-check phase1-check phase2-check phase3-check bootloader application firmware combined \
+.PHONY: all phase0-check phase1-check phase2-check phase3-check phase4-check phase4-hw-test bootloader application firmware combined \
         flash-bootloader flash-application flash-combined dump-metadata erase-metadata gateway tools test release clean toolchain-info
 
-all: phase3-check
+all: phase4-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -16,6 +16,12 @@ phase2-check: phase0-check
 
 phase3-check: phase0-check
 	@$(TOOLCHAIN_ARG) python3 scripts/phase3_check.py
+
+phase4-check: phase3-check
+	@$(TOOLCHAIN_ARG) python3 scripts/phase4_check.py
+
+phase4-hw-test:
+	@$(TOOLCHAIN_ARG) python3 scripts/phase4_hw_test.py
 
 firmware: bootloader application
 
@@ -47,12 +53,12 @@ toolchain-info:
 	@$(MAKE) -C node-stm32f103/bootloader $(TOOLCHAIN_ARG) info
 
 gateway:
-	@echo "ESP32 build begins in Phase 9; Phase 3 covers STM32 metadata and boot decisions."
+	@echo "ESP32 build begins in Phase 9; Phase 4 covers external SPI Flash."
 
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase3-check
+test: phase4-check
 
 release:
 	@echo "The signed release pipeline is implemented in Phase 15."

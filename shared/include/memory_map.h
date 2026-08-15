@@ -41,4 +41,7 @@
 #define EXT_LOG_ADDRESS                  0x062000UL
 #define EXT_LOG_SIZE                     0x010000UL
 
+#define EXT_SELF_TEST_ADDRESS           (EXT_FLASH_SIZE - EXT_FLASH_SECTOR_SIZE)
+#define EXT_SELF_TEST_SIZE              EXT_FLASH_SECTOR_SIZE
+
 #endif

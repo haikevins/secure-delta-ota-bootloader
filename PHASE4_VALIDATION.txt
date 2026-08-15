@@ -1,0 +1,22 @@
+Secure Delta OTA Phase 4 validation
+
+Repository check:
+  make phase4-check -> PASS
+
+Regression:
+  Phase 0 specification -> PASS
+  Phase 1 build foundation -> PASS
+  Phase 2 handoff structural check -> PASS
+  Phase 3 metadata/boot-decision check -> PASS
+
+Phase 4:
+  Host external-Flash geometry/range tests -> PASS
+  Common W25Q32/W25Q64-compatible driver compiles for bootloader and application -> PASS
+  Forced hardware-test application links SPI/storage/self-test symbols -> PASS
+  Forced hardware-test application size -> 4384 bytes
+  Supported JEDEC IDs -> 0xEF4016 (W25Q32), 0xEF4017 (W25Q64)
+  SPI1 -> PA5/PA6/PA7, CS PB0, mode 0, prescaler /4
+  Combined image -> dist/secure-delta-ota-phase4.bin
+
+Physical SPI NOR program/erase behavior is intentionally not claimed by this
+repository-only validation. Run `make phase4-hw-test` on the target board.
