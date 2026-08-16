@@ -1,12 +1,15 @@
 name: Build
+on: [push, pull_request, workflow_dispatch]
 
-on:
-  workflow_dispatch:
+permissions:
+  contents: read
 
 jobs:
-  phase0-placeholder:
+  stm32-phase17:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Phase 0 check
-        run: python3 scripts/phase0_check.py
+      - uses: actions/checkout@v6
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi openssl
+      - run: make phase17-check TOOLCHAIN=gcc

@@ -475,12 +475,23 @@ def main() -> int:
     build_external_sanitizer(toolchain)
     validate_packaging_boundary()
 
+    report = (ROOT / "PHASE16_REPORT.md").read_text(encoding="utf-8")
+    validation = (ROOT / "PHASE16_VALIDATION.txt").read_text(encoding="utf-8")
+    closure_tokens = [
+        "COMPLETE + HARDWARE VERIFIED",
+        "PASS (9 deterministic scenarios)",
+        "0x0008B003",
+    ]
+    for token in closure_tokens:
+        if token not in report + "\n" + validation:
+            fail(f"recorded physical HIL closure missing: {token}")
+
     print(
         "Secure Delta OTA Phase 16 fault injection/HIL check: PASS"
     )
     print(
-        "Physical Phase-16 fault matrix remains the final hardware gate: "
-        "make phase16-hw-test ..."
+        "Phase 16 recorded physical HIL evidence: PASS "
+        "(9 deterministic scenarios)"
     )
     return 0
 

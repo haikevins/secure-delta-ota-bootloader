@@ -23,7 +23,26 @@ STM32 uses **Standard Peripheral Library + CMSIS**, not HAL. ESP32 uses
 - Phase 13 — STM32 delta patching: complete + hardware verified.
 - Phase 14 — Secure container/signature: complete + hardware verified.
 - Phase 15 — Server and release pipeline: complete + hardware verified.
-- Phase 16 — Fault injection and HIL: implemented + host/static/fault-build verified; physical 9-scenario HIL pending.
+- Phase 16 — Fault injection and HIL: complete + hardware verified.
+- Phase 17 — Benchmark and portfolio: complete.
+
+## Final verification
+
+```bash
+make phase17-check
+make phase17-benchmark
+```
+
+Reference portfolio metrics:
+
+- Phase-16 physical fault matrix: **9/9 PASS**.
+- Bootloader flash: **11400 B / 24 KiB (46.39%)**.
+- Application v2 flash: **11276 B / 38 KiB (28.98%)**.
+- Raw JojoDiff savings: **91.40%**.
+- Signed SDOT delta savings: **89.77%**.
+- Final rollback-reset restores confirmed v1 and preserves diagnostic `0x0008B003`.
+
+Start the portfolio walkthrough at `docs/portfolio-one-page.md`.
 
 ## Phase 11 pipeline
 
@@ -312,3 +331,42 @@ See:
 - `docs/phase-16-checklist.md`
 - `PHASE16_REPORT.md`
 
+## Phase 17 benchmark and portfolio
+
+Phase 17 closes the project with reproducible benchmark artifacts and a concise
+portfolio/demo package.
+
+Run the final closure gate:
+
+```bash
+make phase17-check
+```
+
+Generate benchmark outputs:
+
+```bash
+make phase17-benchmark
+```
+
+Generated files:
+
+```text
+dist/phase17/phase17_benchmark.json
+dist/phase17/phase17_benchmark.csv
+dist/phase17/phase17_benchmark.md
+```
+
+The checked-in reference snapshot is under `benchmarks/`. Current reference:
+**89.77% signed-delta savings**,
+bootloader **46.39% of 24 KiB**, and
+application v2 **28.98% of 38 KiB**.
+Benchmark PASS/FAIL
+uses portable constraints (flash/RAM budgets, artifact savings, partition
+fit, 9/9 HIL evidence); host wall-clock timings are informational only.
+
+Portfolio entry points:
+
+- `docs/portfolio-one-page.md`
+- `docs/portfolio-demo.md`
+- `docs/portfolio-evidence.md`
+- `PHASE17_REPORT.md`

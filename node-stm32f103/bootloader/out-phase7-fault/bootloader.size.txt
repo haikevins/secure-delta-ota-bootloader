@@ -1,2 +1,0 @@
-   text	   data	    bss	    dec	    hex	filename
-  11420	      8	   2064	  13492	   34b4	out-phase7-fault/bootloader.elf

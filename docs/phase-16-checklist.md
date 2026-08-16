@@ -21,4 +21,4 @@
 - [x] HIL signing private key is temporary and excluded from the package.
 - [x] `make phase16-check` provides the host/static gate.
 - [x] CI build/release validation includes the Phase-16 host/static gate.
-- [ ] Physical 9-scenario Phase-16 ESP32 + STM32 HIL passes on target hardware.
+- [x] Physical 9-scenario Phase-16 ESP32 + STM32 HIL passes on target hardware.

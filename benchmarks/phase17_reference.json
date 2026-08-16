@@ -1,0 +1,87 @@
+{
+  "artifacts": {
+    "base_bytes": 11264,
+    "base_sha256": "a48ab7f5d0697e6f6a0be1f18308c11d70e37325c9a12b6721a6d7d061839714",
+    "incoming_delta_percent": 0.9,
+    "raw_delta_bytes": 970,
+    "raw_delta_savings_percent": 91.4,
+    "raw_delta_sha256": "5e1fb722585e9f5e99ae9250125a352bc968de293b074ca5defd8c5948adc57f",
+    "signed_delta_bytes": 1174,
+    "signed_delta_savings_percent": 89.77,
+    "signed_full_bytes": 11480,
+    "target_bytes": 11276,
+    "target_sha256": "77e9169ff3770cf11d41aa7eb4d7c861ffa08b63aec93609d9f4347dddb8638d"
+  },
+  "codebase": {
+    "files": 252,
+    "nonblank_lines": 33671
+  },
+  "environment": {
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+    "python": "3.13.5",
+    "toolchain": "clang"
+  },
+  "hardware_hil": {
+    "final_application_version": 1,
+    "passed": 9,
+    "private_signing_key_persisted": false,
+    "rollback_diagnostic": "0x0008B003",
+    "source_phase": 16,
+    "total": 9
+  },
+  "limits": {
+    "application_flash_bytes": 38912,
+    "bootloader_flash_bytes": 24576,
+    "incoming_partition_bytes": 131072,
+    "sram_bytes": 20480
+  },
+  "phase": 17,
+  "policy": {
+    "minimum_delta_savings_percent": 20.0,
+    "note": "Wall-clock times are environment-specific; footprint, artifact savings and HIL scenario count are the portable portfolio claims.",
+    "timing_thresholds": null
+  },
+  "schema": 1,
+  "stm32": {
+    "application_v1": {
+      "binary": 11264,
+      "bss": 1960,
+      "data": 8,
+      "dec": 13224,
+      "flash": 11264,
+      "flash_percent": 28.95,
+      "ram": 1968,
+      "ram_percent": 9.61,
+      "text": 11256
+    },
+    "application_v2": {
+      "binary": 11276,
+      "bss": 1960,
+      "data": 8,
+      "dec": 13236,
+      "flash": 11276,
+      "flash_percent": 28.98,
+      "ram": 1968,
+      "ram_percent": 9.61,
+      "text": 11268
+    },
+    "bootloader": {
+      "binary": 11400,
+      "bss": 2064,
+      "data": 8,
+      "dec": 13464,
+      "flash": 11400,
+      "flash_percent": 46.39,
+      "ram": 2072,
+      "ram_percent": 10.12,
+      "text": 11392
+    }
+  },
+  "timing_seconds": {
+    "application_v1_build": 1.392,
+    "application_v2_build": 1.274,
+    "bootloader_build": 1.827,
+    "delta_roundtrip": 0.708,
+    "signed_release": 7.015
+  }
+}

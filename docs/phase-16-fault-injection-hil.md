@@ -189,5 +189,5 @@ Expected final marker:
 Phase 16 fault injection/HIL hardware test: PASS (9 deterministic scenarios)
 ```
 
-Until that marker is observed on physical ESP32 + STM32 hardware, Phase 16 is
-implemented/host-verified but not hardware-verified.
+That marker was observed on the physical ESP32 + STM32F103 + W25Q setup.
+Phase 16 is therefore COMPLETE + HARDWARE VERIFIED.

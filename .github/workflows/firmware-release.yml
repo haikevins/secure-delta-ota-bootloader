@@ -39,8 +39,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi openssl
-      - name: Phase 15 validation without production secret
+      - name: Phase 15 protected-release validation
         run: make phase15-check TOOLCHAIN=gcc
+      - name: Phase 16 fault-injection validation
+        run: python3 scripts/phase16_check.py
+      - name: Phase 17 portfolio closure
+        run: python3 scripts/phase17_check.py --static-only
 
   release:
     needs: validate

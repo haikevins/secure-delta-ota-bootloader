@@ -8,13 +8,12 @@ matrix and a host/static regression gate.
 Status:
 
 ```text
-IMPLEMENTED + HOST/STATIC/FAULT-BUILD VERIFIED
-PHYSICAL 9-SCENARIO HIL: PENDING
+COMPLETE + HARDWARE VERIFIED
+PHYSICAL 9-SCENARIO HIL: PASS
 ```
 
-Hardware verification is intentionally not claimed until
-`scripts/phase16_hw_test.py` completes all scenarios on the actual ESP32,
-STM32F103 and external SPI NOR hardware.
+The final physical run completed all nine deterministic scenarios on the
+ESP32 + STM32F103 + external SPI NOR hardware.
 
 ## What Phase 16 adds
 
@@ -249,3 +248,24 @@ This makes negative terminal state delivery symmetric with the existing
 `confirmed` terminal state and preserves the Phase-15 QoS-1 status contract.
 Phase-16 static validation rejects any regression back to asynchronous
 `PublishFailure()` behavior.
+
+## Physical HIL closure — 9/9 PASS
+
+The final Phase-16 hardware run completed the full deterministic matrix.
+
+Observed final rollback-reset evidence:
+
+```text
+P16_STM32_METADATA label=rollback-reset generation=74 state=0 active_version=1 pending_version=0 boot_attempts=0 last_error=0x0008B003
+P16_STM32_VERIFY=PASS label=rollback-reset app=v1
+P16_SCENARIO=PASS id=rollback-reset generation=74 gateway=EXPECTED_FAIL
+P16_FAULT_WITNESS=PASS id=patch-reset generation=34 control=33
+P16_FAULT_WITNESS=PASS id=backup-reset generation=34 control=33
+P16_FAULT_WITNESS=PASS id=install-midpage-reset generation=34 control=33
+P16_MQTT_ISOLATION=PASS generation=33
+P16_ROLLBACK_FAULT_WITNESS=PASS generation=74 control=73
+Phase 16 fault injection/HIL hardware test: PASS (9 deterministic scenarios)
+Final board state: rollback-reset scenario restores confirmed application v1; no HIL signing private key persisted.
+```
+
+This closes Phase 16 as **COMPLETE + HARDWARE VERIFIED**.

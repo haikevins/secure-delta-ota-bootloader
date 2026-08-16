@@ -12,11 +12,12 @@ TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
         phase14-check phase14-v1 phase14-v2 phase14-v3 phase14-hw-test \
         phase15-check phase15-hw-test phase15-gateway-build phase15-release \
         phase16-check phase16-hw-test \
+        phase17-check phase17-benchmark \
         bootloader application firmware combined \
         flash-bootloader flash-application flash-combined dump-metadata erase-metadata \
         gateway tools test release clean toolchain-info
 
-all: phase16-check
+all: phase17-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -341,6 +342,13 @@ phase16-hw-test:
 
 
 
+phase17-check: phase16-check
+	@$(TOOLCHAIN_ARG) python3 scripts/phase17_check.py
+
+phase17-benchmark:
+	@$(TOOLCHAIN_ARG) python3 scripts/phase17_benchmark.py --output-dir dist/phase17
+
+
 firmware: bootloader application
 
 bootloader:
@@ -377,7 +385,7 @@ gateway: phase11-gateway-build
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase16-check
+test: phase17-check
 
 release:
 	@echo "Use make phase15-release TARGET=... TARGET_VERSION=... SIGNING_KEY=/secure/path/key.pem KEY_ID=0x... BASE_URL=https://firmware.example"
@@ -431,6 +439,11 @@ clean:
 	@rm -rf node-stm32f103/application/out-phase16-*
 	@rm -rf node-stm32f103/bootloader/build-phase16-*
 	@rm -rf node-stm32f103/bootloader/out-phase16-*
+	@rm -rf node-stm32f103/application/build-phase17-*
+	@rm -rf node-stm32f103/application/out-phase17-*
+	@rm -rf node-stm32f103/bootloader/build-phase17-*
+	@rm -rf node-stm32f103/bootloader/out-phase17-*
+	@rm -rf .phase17-benchmark-tmp
 	@rm -rf node-stm32f103/bootloader/build-phase7-fault
 	@rm -rf node-stm32f103/bootloader/out-phase7-fault
 	@rm -rf gateway-esp32/build gateway-esp32/sdkconfig dist build-host

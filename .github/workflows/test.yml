@@ -1,12 +1,38 @@
 name: Test
+on: [push, pull_request, workflow_dispatch]
 
-on:
-  workflow_dispatch:
+permissions:
+  contents: read
 
 jobs:
-  phase0-placeholder:
+  host-security-release-regressions:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Phase 0 check
-        run: python3 scripts/phase0_check.py
+      - uses: actions/checkout@v6
+      - name: Python syntax and JojoDiff regression
+        run: |
+          python3 -m py_compile \
+            tools/phase14_keytool.py \
+            tools/phase14_secure_container.py \
+            tools/phase15_release.py \
+            server/app/main.py \
+            server/app/services/*.py \
+            scripts/phase15_check.py \
+            scripts/phase15_hw_test.py \
+            scripts/phase16_check.py \
+            scripts/phase16_hw_test.py \
+            tools/phase16_mqtt_broker.py \
+            tools/phase16_fault_https_server.py \
+            scripts/phase17_benchmark.py \
+            scripts/phase17_check.py
+          python3 tests/unit/test_phase12_jojodiff.py
+      - name: ESP32 secure-container UART contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Igateway-esp32/components/secure_container_meta/include \
+            -Igateway-esp32/components/uart_ota/include \
+            gateway-esp32/components/secure_container_meta/secure_container_meta.c \
+            gateway-esp32/components/uart_ota/uart_ota_protocol.c \
+            tests/host/test_phase15_gateway_contract.c \
+            -o /tmp/phase15_gateway_contract
+          /tmp/phase15_gateway_contract
