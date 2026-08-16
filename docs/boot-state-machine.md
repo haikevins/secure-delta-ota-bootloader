@@ -1,6 +1,6 @@
 # Boot and Update State Machine
 
-Status: **trial boot and rollback full-image trial boot and rollback implemented; delta/security states remain planned**
+Status: **Implemented: signed full/delta install, persistent recovery, trial boot and rollback**
 
 ## 1. Update states
 
@@ -83,7 +83,7 @@ FAILED permits a new START after explicit cleanup.
 ```
 
 
-## trial boot and rollback implemented full-image path
+## Implemented trial boot and rollback path
 
 ```text
 RECEIVING -> ARTIFACT_READY

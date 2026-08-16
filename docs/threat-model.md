@@ -1,6 +1,6 @@
 # Threat Model
 
-Status: initial scaffold baseline
+Status: implemented security/recovery baseline with physical negative testing
 
 ## Assets
 
@@ -31,7 +31,7 @@ Status: initial scaffold baseline
 | New firmware boot failure | Trial boot and rollback |
 | Metadata corruption | Redundant copies, CRC32, generation counter |
 
-## Out of scope for first secure release
+## Out of scope
 
 - physical invasive attacks;
 - debug-port lock policy and irreversible RDP deployment;

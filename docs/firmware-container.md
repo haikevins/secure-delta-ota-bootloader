@@ -1,6 +1,6 @@
 # Secure Firmware Container Specification Version 1
 
-Status: **Frozen for initial scaffold**
+Status: **Signed SDOT v1 implemented and enforced by the STM32 bootloader**
 
 ## 1. Goals
 
@@ -211,7 +211,7 @@ container format.
 
 signed secure container now implements the previously reserved signed-container interface.
 
-The initial scaffold fixed header remains 120 bytes. A signed `SCX1` extension v1 adds
+The fixed header is 120 bytes. A signed `SCX1` extension v1 adds
 20 bytes, so the implemented canonical `header_size` is 140 bytes.
 
 `SCX1` carries:
@@ -231,10 +231,9 @@ signature_size      = 64
 signature encoding  = big-endian r[32] || s[32]
 ```
 
-The signature covers the complete 140-byte header plus payload. Unsigned raw
-full and streaming delta reconstruction D13P artifacts are disabled by default in signed secure container.
+The signature covers the complete 140-byte header plus payload. Unsigned raw full and streaming delta reconstruction artifacts are disabled by default in the secure build.
 
 The private signing key remains host-side. The STM32 bootloader contains only a
 public P-256 trust anchor and key ID.
 
-Key custody, release authorization and server publication remain release pipeline.
+Key custody, release authorization and server publication are handled by the release pipeline.

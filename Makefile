@@ -1,6 +1,6 @@
 TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
 
-.PHONY: all check benchmark hil-test \
+.PHONY: all help check warning-check benchmark hil-test \
         bootloader application firmware combined \
         gateway gateway-build release \
         flash-bootloader flash-application flash-combined \
@@ -9,8 +9,58 @@ TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
 
 all: check
 
+help:
+	@printf '%s\n' \
+	  'Secure Delta OTA Bootloader - make targets' \
+	  '' \
+	  'Validation and quality:' \
+	  '  make check [TOOLCHAIN=gcc|clang]          Full integrated host/build/security/benchmark gate' \
+	  '  make warning-check [TOOLCHAIN=gcc|clang]  Rebuild STM32 firmware with compiler warnings as errors' \
+	  '  make benchmark [TOOLCHAIN=gcc|clang]      Generate JSON/CSV/Markdown benchmark reports' \
+	  '  make test [TOOLCHAIN=gcc|clang]           Alias of make check' \
+	  '  make tools                                Python syntax/bytecode smoke check for tools/server/scripts' \
+	  '' \
+	  'STM32 firmware:' \
+	  '  make firmware [TOOLCHAIN=gcc|clang]       Build bootloader + application' \
+	  '  make bootloader [TOOLCHAIN=gcc|clang]     Build bootloader only' \
+	  '  make application [TOOLCHAIN=gcc|clang]    Build application only' \
+	  '  make combined [TOOLCHAIN=gcc|clang]       Build and merge bootloader + application binary' \
+	  '  make toolchain-info [TOOLCHAIN=...]       Show selected STM32 compiler/linker/output paths' \
+	  '' \
+	  'ESP32 gateway:' \
+	  '  make gateway                              Build gateway with active ESP-IDF environment' \
+	  '  make gateway-build                        Same gateway build target, explicit name' \
+	  '' \
+	  'Release:' \
+	  '  make release TARGET=... TARGET_VERSION=N SIGNING_KEY=... KEY_ID=... BASE_URL=https://...' \
+	  '                                            Create immutable signed full/delta release artifacts' \
+	  '' \
+	  'Hardware / OpenOCD:' \
+	  '  make flash-bootloader [TOOLCHAIN=...]     Build and flash bootloader with ST-Link' \
+	  '  make flash-application [TOOLCHAIN=...]    Build and flash application with ST-Link' \
+	  '  make flash-combined [TOOLCHAIN=...]       Build and flash merged image at 0x08000000' \
+	  '  make dump-metadata                        Dump and decode internal metadata A/B pages' \
+	  '  make erase-metadata                       Erase internal metadata A/B pages (destructive)' \
+	  '  make hil-test ...                         Run 9-scenario deterministic hardware fault matrix' \
+	  '' \
+	  'Maintenance:' \
+	  '  make clean                                Remove STM32/ESP32/generated benchmark build outputs' \
+	  '' \
+	  'See README.md and docs/make-command-reference.md for variables, prerequisites, examples and outputs.'
+
 check:
 	@$(TOOLCHAIN_ARG) python3 scripts/project_check.py
+
+warning-check:
+	@$(MAKE) -C node-stm32f103/bootloader $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-warning OUT_DIR=out-warning \
+		PROJECT_CFLAGS="-Werror" clean all
+	@$(MAKE) -C node-stm32f103/application $(TOOLCHAIN_ARG) \
+		BUILD_DIR=build-warning OUT_DIR=out-warning \
+		PROJECT_CFLAGS="-Werror" clean all
+	@rm -rf node-stm32f103/bootloader/build-warning node-stm32f103/bootloader/out-warning
+	@rm -rf node-stm32f103/application/build-warning node-stm32f103/application/out-warning
+	@echo "WARNING_CLEAN_BUILD=PASS"
 
 benchmark:
 	@$(TOOLCHAIN_ARG) python3 scripts/benchmark.py --output-dir dist/benchmark

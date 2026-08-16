@@ -1,6 +1,6 @@
 # Memory Map Specification
 
-Status: **Base map frozen; trial boot and rollback defines a sublayout inside Backup Image**
+Status: **Implemented memory map with redundant metadata, staging and rollback backup**
 
 All addresses are inclusive unless stated otherwise.
 
@@ -17,9 +17,8 @@ Nominal size: 64 KiB, `0x08000000`–`0x0800FFFF`.
 
 Total: 24 + 38 + 1 + 1 = 64 KiB.
 
-initial scaffold reserved one 1 KiB metadata placeholder. persistent metadata deliberately consumes
-one additional page and reduces the application by 1 KiB so each redundant copy
-has an independent erase page. This is required for a power-loss-safe commit.
+The final layout reserves two independent 1 KiB metadata erase pages. This reduces
+the application region to 38 KiB and allows a power-loss-safe redundant metadata commit.
 
 ### Application linker region
 
@@ -44,7 +43,7 @@ MEMORY
 
 Nominal SRAM: 20 KiB, `0x20000000`–`0x20004FFF`.
 
-persistent metadata adds only small stack-local metadata records. No persistent SRAM is
+Metadata handling uses only small stack-local records. No persistent SRAM is
 shared across the bootloader/application handoff.
 
 ## 3. W25Q32 external SPI NOR Flash
@@ -64,17 +63,16 @@ Nominal size: 4 MiB, `0x000000`–`0x3FFFFF`.
 
 The external-flash integration driver and storage abstraction enforce these bounds. External metadata does not replace the two internal boot-critical records introduced in persistent metadata.
 
-full-image OTA/7 uses the first 36 bytes of each 4 KiB external metadata sector for
-the A/B install handoff record. power-loss recovery additionally stores a 40-byte download
+The install handoff uses the first 36 bytes of each 4 KiB external metadata sector for
+the A/B install handoff record. Receive recovery additionally stores a 40-byte download
 checkpoint at sector offset `0x100`. Because either record update requires a
 whole-sector erase, the storage layer preserves the other valid record while
 rewriting its target A/B sector.
 
 
-### trial boot and rollback Backup Image sublayout
+### Backup Image sublayout
 
-The 128 KiB Backup Image partition keeps its frozen outer boundaries. trial boot and rollback
-uses it as:
+The 128 KiB Backup Image partition uses the following internal sublayout:
 
 | Subregion | Relative offset | Absolute start | Purpose |
 |---|---:|---:|---|

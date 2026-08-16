@@ -2,28 +2,46 @@
 
 Portfolio-grade secure OTA update system for an STM32F103C8T6 node with an ESP32 network gateway and external W25Q SPI NOR flash.
 
-The repository includes the bootloader, application-side OTA receiver, ESP32 gateway, signed release tooling, deterministic fault-injection HIL runner, reproducible benchmark tooling, CI contracts, and portfolio documentation.
+The repository includes the STM32 bootloader, application-side OTA receiver, ESP32 gateway, signed release tooling, deterministic fault-injection hardware test runner, reproducible benchmark tooling, CI validation, and evidence-oriented portfolio documentation.
+
+## Project status
+
+The integrated implementation is complete and has been validated as one end-to-end system.
+
+Verified evidence currently recorded in the repository:
+
+- deterministic hardware fault matrix: **9/9 PASS**;
+- secure signed full and delta artifact path: PASS;
+- rollback after an unhealthy candidate: PASS;
+- reset during rollback recovery: PASS;
+- packaging boundary with no private signing key: PASS;
+- reproducible STM32 flash/RAM and delta-efficiency benchmark: PASS;
+- warning-clean STM32 Clang build with `-Werror`: PASS;
+- user-verified GCC benchmark: bootloader `9412 B`, application v2 `9648 B`, signed delta savings `85.32%`.
+
+The checked-in benchmark reference is compiler-specific and is not treated as an immutable binary-size promise. Run `make benchmark` on the current host for a fresh measurement.
 
 ## What the system demonstrates
 
-- **Secure boot/update boundary:** SHA-256 + ECDSA P-256 signed SDOT containers.
+- **Secure firmware trust boundary:** SHA-256 + ECDSA P-256 signed SDOT containers.
 - **Delta OTA:** JojoDiff-compatible host generation and streaming reconstruction on STM32.
 - **Resumable transport:** COBS-framed UART protocol with sequence, offset, ACK/NACK, retry and resume.
 - **External staging:** W25Q32/W25Q64 support with a fixed logical 4 MiB OTA layout.
 - **Power-loss recovery:** persistent checkpoints for receive, patch, backup, install and rollback paths.
 - **Trial boot and rollback:** candidate firmware must confirm health; otherwise the validated backup is restored.
 - **Network gateway:** ESP32 uses MQTTS for orchestration/status and HTTPS for firmware bytes.
-- **Release pipeline:** immutable signed releases, exact previous-binary deltas, full-image fallback and signed manifests.
-- **Deterministic HIL:** nine hardware fault scenarios covering reset, transport failure, signature tamper and rollback recovery.
-- **Reproducible benchmark:** flash/RAM footprint, raw/signed delta efficiency and build-time observations.
+- **Release engineering:** immutable signed releases, exact previous-binary deltas, full-image fallback and signed manifests.
+- **Deterministic HIL:** nine hardware scenarios covering resets, transport failure, signature tamper and rollback recovery.
+- **Reproducible benchmark:** flash/RAM footprint, raw/signed delta efficiency, artifact fit and timing observations.
+- **Portfolio evidence:** claims are mapped to source, tests, benchmark output and hardware results.
 
 ## Hardware
 
 - STM32F103C8T6 Blue Pill
 - ESP32 gateway
-- W25Q64 external SPI NOR on STM32
-- ST-Link/V2 for SWD programming/debug
-- UART between ESP32 and STM32
+- W25Q64 external SPI NOR on STM32 (W25Q32 also supported)
+- ST-Link/V2 or compatible ST-Link for SWD
+- UART connection between ESP32 and STM32
 
 UART wiring:
 
@@ -40,7 +58,11 @@ STM32 PA5  -> W25Q SCK
 STM32 PA6  <- W25Q MISO
 STM32 PA7  -> W25Q MOSI
 STM32 PB0  -> W25Q CS
+3.3 V      -> W25Q VCC
+GND        -> W25Q GND
 ```
+
+For a bare W25Q device, `/WP` and `/HOLD` must be kept high.
 
 ## Memory layout
 
@@ -53,16 +75,25 @@ Internal flash:
 0x0800FC00 - 0x0800FFFF   Metadata B         1 KiB
 ```
 
+SRAM:
+
+```text
+0x20000000 - 0x20004FFF   SRAM              20 KiB
+```
+
 External logical OTA layout:
 
 ```text
-0x000000 - 0x001FFF   Metadata A/B
+0x000000 - 0x000FFF   External metadata A      4 KiB
+0x001000 - 0x001FFF   External metadata B      4 KiB
 0x002000 - 0x021FFF   Incoming artifact      128 KiB
 0x022000 - 0x041FFF   Reconstructed image    128 KiB
 0x042000 - 0x061FFF   Validated backup       128 KiB
-0x062000 - 0x071FFF   Logs                    64 KiB
+0x062000 - 0x071FFF   Update logs             64 KiB
 remaining space       Reserved
 ```
+
+The W25Q64 development device is larger than the logical map; the OTA design deliberately uses only the first 4 MiB so it remains compatible with W25Q32.
 
 ## End-to-end update flow
 
@@ -92,21 +123,23 @@ HTTPS release server <---- MQTTS command/status ----> ESP32 gateway
                                     confirm or automatic rollback
 ```
 
-Firmware bytes remain on HTTPS. MQTT is used only for orchestration, progress and terminal status.
+Firmware bytes remain on HTTPS. MQTT is used for orchestration, progress and terminal status. The STM32 bootloader remains the final firmware-authentication and installation authority.
 
 ## Security model
 
-The SDOT container binds:
+The signed SDOT container binds:
 
-- image type;
+- container/image type;
 - product and hardware revision;
 - base and target versions;
-- payload size;
-- SHA-256 of payload/base/target;
+- payload and target sizes;
+- SHA-256 of payload, base image and target image;
 - signing key ID;
 - ECDSA P-256 signature over the signed header plus payload.
 
-Unsigned legacy artifacts are disabled in the secure build. Anti-downgrade checks reject target versions that are not newer than the active version.
+CRC32 is used for transport/storage corruption detection; it is not treated as an authenticity mechanism.
+
+Unsigned legacy artifacts are disabled in the secure build. Anti-downgrade checks reject a target version that is not newer than the active version.
 
 The repository intentionally ships with an **unprovisioned trust anchor**:
 
@@ -115,88 +148,146 @@ The repository intentionally ships with an **unprovisioned trust anchor**:
 #define TRUSTED_KEY_ID          0UL
 ```
 
-Use `tools/keytool.py` during a controlled build to generate a provisioned public-key header. Private signing keys are never embedded in STM32 firmware and are not included in this repository.
+Use `tools/keytool.py` in a controlled provisioning/build process to generate a public-key header. Private signing keys must remain outside the repository, ESP32 and STM32.
 
-## Build and verification
+## Prerequisites
 
-### Prerequisites
+### General host tools
 
-For STM32 builds, use either GNU Arm Embedded GCC or Clang/LLD:
+Recommended Linux host packages:
 
-```bash
-# GNU Arm Embedded
-arm-none-eabi-gcc --version
-arm-none-eabi-objcopy --version
-
-# Or Clang
-clang --version
-llvm-objcopy --version
+```text
+make
+python3
+openssl
+git
 ```
 
-If `TOOLCHAIN` is omitted, the STM32 build automatically prefers
-`arm-none-eabi-gcc`; otherwise it falls back to Clang when available.
+### STM32 build toolchain
 
-For ESP32 builds, activate ESP-IDF first:
+Use one of:
+
+```text
+GNU Arm Embedded:
+  arm-none-eabi-gcc
+  arm-none-eabi-objcopy
+  arm-none-eabi-size
+
+Clang/LLVM:
+  clang
+  lld
+  llvm-objcopy
+  size
+```
+
+If `TOOLCHAIN` is omitted, the common STM32 build selects GNU Arm GCC when available, otherwise Clang/LLVM.
+
+### ESP32 gateway
+
+ESP-IDF must be installed and its environment activated before gateway or HIL commands:
 
 ```bash
 source ~/esp/esp-idf/export.sh
 ```
 
-For STM32 programming and metadata operations, install OpenOCD and connect the
-ST-Link. The flash helpers use these optional variables:
+### STM32 hardware access
 
-```bash
-export OPENOCD=/usr/bin/openocd
-export OPENOCD_INTERFACE=interface/stlink.cfg
-export OPENOCD_TARGET=target/stm32f1x.cfg
+OpenOCD plus ST-Link are required for flash, metadata and hardware tests.
+
+For normal flash scripts, the defaults are:
+
+```text
+OPENOCD=openocd
+OPENOCD_INTERFACE=interface/stlink.cfg
+OPENOCD_TARGET=target/stm32f1x.cfg
 ```
 
-The HIL runner has separate OpenOCD discovery variables:
+For the HIL runner, STM32-capable OpenOCD can be selected explicitly:
 
 ```bash
 export STM32_OPENOCD=/usr/bin/openocd
 export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
 ```
 
-### Make command reference
+This distinction is useful on hosts that also contain an ESP32-specific OpenOCD installation.
 
-All commands below are run from the repository root.
+---
 
-| Command | Purpose | Main output / effect |
-|---|---|---|
-| `make` | Run the default target. Equivalent to `make all`, which runs the integrated project check. | Validation result on stdout |
-| `make all` | Alias for the integrated project check. | Same as `make check` |
-| `make check [TOOLCHAIN=gcc\|clang]` | Run host checks, source/security contracts, build validation, fault-build matrix, benchmark validation, and portfolio checks. | Final `SECURE_DELTA_OTA_PROJECT_CHECK=PASS` marker |
-| `make test [TOOLCHAIN=gcc\|clang]` | Alias for `make check`. | Same as `make check` |
-| `make benchmark [TOOLCHAIN=gcc\|clang]` | Rebuild benchmark firmware, generate delta/signed artifacts, measure footprint and delta efficiency. | `dist/benchmark/benchmark.json`, `.csv`, `.md` |
-| `make firmware [TOOLCHAIN=gcc\|clang]` | Build both STM32 bootloader and application. | Component ELF/BIN/HEX/MAP/size files |
-| `make bootloader [TOOLCHAIN=gcc\|clang]` | Build only the STM32 bootloader. | `node-stm32f103/bootloader/out/` |
-| `make application [TOOLCHAIN=gcc\|clang]` | Build only the STM32 application. | `node-stm32f103/application/out/` |
-| `make combined [TOOLCHAIN=gcc\|clang]` | Build bootloader + application, then merge them into one programming image. | `dist/secure-delta-ota-combined.bin` |
-| `make gateway` | Build the ESP32 gateway. Alias for `make gateway-build`. Requires active ESP-IDF environment. | `gateway-esp32/build/` |
-| `make gateway-build` | Run the ESP32 build guard and `idf.py build`. | `gateway-esp32/build/` |
-| `make release ...` | Generate an immutable signed firmware release with full-image fallback and optional delta. | `dist/releases/` by default |
-| `make flash-bootloader [TOOLCHAIN=gcc\|clang]` | Build and program only the bootloader with OpenOCD/ST-Link. | Programs bootloader at its linker address |
-| `make flash-application [TOOLCHAIN=gcc\|clang]` | Build and program only the application with OpenOCD/ST-Link. | Programs application at its linker address |
-| `make flash-combined [TOOLCHAIN=gcc\|clang]` | Build the merged image and program it from `0x08000000`. | Programs bootloader + application |
-| `make dump-metadata` | Read the two internal-flash metadata pages through OpenOCD and decode them. | `dist/metadata-pages.bin` + decoded metadata on stdout |
-| `make erase-metadata` | Erase internal metadata pages `0x0800F800..0x0800FFFF`. | Destructive metadata erase on connected STM32 |
-| `make hil-test ...` | Execute the deterministic nine-scenario hardware-in-the-loop fault suite. | Scenario markers and final HIL PASS/FAIL |
-| `make toolchain-info [TOOLCHAIN=gcc\|clang]` | Show the selected STM32 compiler, target, linker script and output ELF. | Toolchain information on stdout |
-| `make tools` | Python syntax-compile the host tooling under `tools/`, `server/`, and `scripts/`. | Python compile check |
-| `make clean` | Remove STM32 outputs, ESP-IDF build/config outputs, benchmark temporary files and `dist/`. | Clean working tree outputs |
+# Make command reference
 
-### Common STM32 build commands
-
-Check which compiler will be used:
+Run the built-in command summary at any time:
 
 ```bash
-make toolchain-info
-make toolchain-info TOOLCHAIN=gcc
-make toolchain-info TOOLCHAIN=clang
+make help
 ```
 
-Run the complete verification gate:
+The sections below document every public root-level target in the project.
+
+## Quick command matrix
+
+| Command | Purpose | Hardware required | Main output |
+|---|---|---:|---|
+| `make` / `make all` | Run integrated project closure | No | PASS/FAIL markers |
+| `make help` | Print command summary | No | Terminal help |
+| `make check` | Full source/security/build/benchmark validation | No | Integrated PASS/FAIL |
+| `make warning-check` | Rebuild STM32 code with warnings as errors | No | `WARNING_CLEAN_BUILD=PASS` |
+| `make benchmark` | Generate reproducible benchmark reports | No | `dist/benchmark/*` |
+| `make test` | Alias of `make check` | No | Same as `make check` |
+| `make tools` | Python compile smoke check | No | Exit status |
+| `make firmware` | Build bootloader + application | No | STM32 `out/*` |
+| `make bootloader` | Build bootloader only | No | `bootloader.elf/.bin/.hex` |
+| `make application` | Build application only | No | `application.elf/.bin/.hex` |
+| `make combined` | Merge bootloader + application image | No | `dist/secure-delta-ota-combined.bin` |
+| `make toolchain-info` | Show selected STM32 toolchain | No | Toolchain paths/settings |
+| `make gateway` | Build ESP32 gateway | No board required for compile | `gateway-esp32/build/` |
+| `make gateway-build` | Explicit alias for gateway build | No board required for compile | Same as `make gateway` |
+| `make release` | Create immutable signed release | No | `dist/releases/...` |
+| `make flash-bootloader` | Build + flash bootloader | STM32 + ST-Link | STM32 programmed |
+| `make flash-application` | Build + flash application | STM32 + ST-Link | STM32 programmed |
+| `make flash-combined` | Build + flash merged image | STM32 + ST-Link | STM32 programmed |
+| `make dump-metadata` | Dump + decode metadata pages | STM32 + ST-Link | `dist/metadata-pages.bin` |
+| `make erase-metadata` | Erase internal metadata A/B | STM32 + ST-Link | Metadata reset |
+| `make hil-test` | Run deterministic 9-scenario HIL | STM32 + ESP32 + W25Q + ST-Link | Scenario PASS/FAIL |
+| `make clean` | Remove generated build/report outputs | No | Clean working tree outputs |
+
+The `TOOLCHAIN` assignment can appear before or after the target:
+
+```bash
+make firmware TOOLCHAIN=gcc
+make TOOLCHAIN=gcc firmware
+```
+
+Supported values are `gcc` and `clang`.
+
+## `make` / `make all`
+
+Default entry point. It is intentionally equivalent to the integrated closure:
+
+```bash
+make
+```
+
+Equivalent to:
+
+```bash
+make check
+```
+
+Use this when you want the repository's default quality gate.
+
+## `make help`
+
+Print the root target summary:
+
+```bash
+make help
+```
+
+This command does not build firmware and does not require a toolchain.
+
+## `make check`
+
+Run the complete host/build/security/portfolio validation:
 
 ```bash
 make check TOOLCHAIN=gcc
@@ -208,216 +299,60 @@ or:
 make check TOOLCHAIN=clang
 ```
 
-A successful integrated check ends with:
+The integrated checker validates:
+
+- clean product presentation and first-party source contracts;
+- deterministic hardware evidence record;
+- checked-in reference benchmark schema and limits;
+- trust-anchor and credential packaging boundary;
+- secure container and recovery source contracts;
+- CI/release automation contracts;
+- Python syntax and host regression tests;
+- STM32 deterministic fault-build variants;
+- external-flash sanitizer build;
+- live benchmark generation and artifact policy.
+
+Expected terminal marker:
 
 ```text
 SECURE_DELTA_OTA_PROJECT_CHECK=PASS
 ```
 
-Build both STM32 images:
+For a quick static-only check without STM32 builds/live benchmark:
 
 ```bash
-make firmware TOOLCHAIN=gcc
+python3 scripts/project_check.py --static-only
 ```
 
-Build components separately:
+That direct Python command is useful while editing documentation or CI files.
+
+## `make warning-check`
+
+Force a clean STM32 rebuild with compiler warnings promoted to errors:
 
 ```bash
-make bootloader TOOLCHAIN=gcc
-make application TOOLCHAIN=gcc
-```
-
-The component build directories contain:
-
-```text
-out/
-├── <target>.elf
-├── <target>.bin
-├── <target>.hex
-├── <target>.map
-└── <target>.size.txt
-```
-
-Create a single image containing both the bootloader and application:
-
-```bash
-make combined TOOLCHAIN=gcc
-```
-
-Output:
-
-```text
-dist/secure-delta-ota-combined.bin
-```
-
-### ESP32 gateway build
-
-Activate ESP-IDF:
-
-```bash
-source ~/esp/esp-idf/export.sh
-```
-
-Then run either alias:
-
-```bash
-make gateway
+make warning-check TOOLCHAIN=gcc
 ```
 
 or:
 
 ```bash
-make gateway-build
+make warning-check TOOLCHAIN=clang
 ```
 
-The command refuses to run when `idf.py` is unavailable and executes the
-gateway build guard before invoking `idf.py build`.
+This target uses temporary `build-warning` / `out-warning` directories and removes them after success.
 
-### STM32 programming with ST-Link/OpenOCD
-
-Optional OpenOCD overrides:
-
-```bash
-export OPENOCD=/usr/bin/openocd
-export OPENOCD_INTERFACE=interface/stlink.cfg
-export OPENOCD_TARGET=target/stm32f1x.cfg
-```
-
-Program only the bootloader:
-
-```bash
-make flash-bootloader TOOLCHAIN=gcc
-```
-
-Program only the application:
-
-```bash
-make flash-application TOOLCHAIN=gcc
-```
-
-Program the merged bootloader + application image:
-
-```bash
-make flash-combined TOOLCHAIN=gcc
-```
-
-Each flash helper rebuilds the required image first and requests OpenOCD
-verification before reset.
-
-### Metadata maintenance
-
-Dump and decode both redundant metadata pages:
-
-```bash
-make dump-metadata
-```
-
-The default raw dump is:
+Expected marker:
 
 ```text
-dist/metadata-pages.bin
+WARNING_CLEAN_BUILD=PASS
 ```
 
-Erase both metadata pages:
+Use this before publishing a portfolio snapshot or after changing C code. It is also executed by the build CI workflow.
 
-```bash
-make erase-metadata
-```
+## `make benchmark`
 
-`erase-metadata` is destructive. It erases the internal-flash range
-`0x0800F800..0x0800FFFF`; use it only when intentionally resetting persistent
-boot/update metadata.
-
-### HIL fault-injection test
-
-Activate ESP-IDF and configure STM32 OpenOCD discovery:
-
-```bash
-source ~/esp/esp-idf/export.sh
-
-export STM32_OPENOCD=/usr/bin/openocd
-export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
-```
-
-Minimum practical invocation:
-
-```bash
-make hil-test \
-  TOOLCHAIN=gcc \
-  ESP32_PORT=/dev/ttyUSB0 \
-  WIFI_SSID="your-ssid" \
-  WIFI_PASSWORD="your-password" \
-  SDOTA_HOST_IP=<PC_LAN_IP>
-```
-
-Supported HIL variables:
-
-| Variable | Required | Default / behavior |
-|---|---|---|
-| `TOOLCHAIN` | No | Auto-detects `gcc`, then `clang` |
-| `ESP32_PORT` | Yes | ESP32 serial device, for example `/dev/ttyUSB0` |
-| `PORT` | No | Backward-compatible alias used only when `ESP32_PORT` is empty |
-| `WIFI_SSID` | Yes | Wi-Fi SSID used by the ESP32 |
-| `WIFI_PASSWORD` | Depends on network | Empty string is allowed by the wrapper |
-| `SDOTA_HOST_IP` | Recommended | PC LAN IPv4; runner attempts automatic detection if omitted |
-| `HTTPS_PORT` | No | `8443` |
-| `MQTT_PORT` | No | `8883` |
-| `SDOTA_HIL_KEY_ID` | No | `0xC0DE0001`; must be a non-zero 32-bit value |
-
-The test requires the ESP32 UART link, STM32 ST-Link connection, external
-W25Q flash, active ESP-IDF environment, OpenSSL, and network reachability
-between the ESP32 and the host PC.
-
-### Signed release generation
-
-Full-image release:
-
-```bash
-make release \
-  TARGET=path/to/application-v2.bin \
-  TARGET_VERSION=2 \
-  SIGNING_KEY=/secure/path/release-key.pem \
-  KEY_ID=0x15000001 \
-  BASE_URL=https://firmware.example
-```
-
-Delta-capable release from an exact previous application binary:
-
-```bash
-make release \
-  TARGET=path/to/application-v2.bin \
-  TARGET_VERSION=2 \
-  BASE=path/to/application-v1.bin \
-  BASE_VERSION=1 \
-  SIGNING_KEY=/secure/path/release-key.pem \
-  KEY_ID=0x15000001 \
-  BASE_URL=https://firmware.example \
-  CHANNEL=stable \
-  RELEASE_ROOT=dist/releases
-```
-
-Variables accepted by the top-level `make release` target:
-
-| Variable | Required | Meaning |
-|---|---|---|
-| `TARGET` | Yes | Target application `.bin` |
-| `TARGET_VERSION` | Yes | Numeric target firmware version |
-| `BASE` | No | Exact previous application `.bin`; enables delta generation |
-| `BASE_VERSION` | Required with `BASE` | Numeric version of the base image |
-| `SIGNING_KEY` | Yes | External ECDSA P-256 private signing-key path |
-| `KEY_ID` | Yes | Public signing-key identifier, decimal or `0x...` |
-| `BASE_URL` | Yes | HTTPS base URL embedded in the release manifest |
-| `CHANNEL` | No | `stable` by default; release tool also supports `beta` and `dev` |
-| `RELEASE_ROOT` | No | `dist/releases` by default |
-
-The private signing key must remain outside the repository. The release tooling
-validates the application image, signs SDOT artifacts, verifies the generated
-signature, enforces the artifact-size limit, and includes a delta only when the
-configured savings policy is satisfied.
-
-### Benchmark command
-
-Run the reproducible benchmark:
+Run a fresh benchmark using the current toolchain and host:
 
 ```bash
 make benchmark TOOLCHAIN=gcc
@@ -429,7 +364,7 @@ or:
 make benchmark TOOLCHAIN=clang
 ```
 
-Outputs:
+Generated files:
 
 ```text
 dist/benchmark/benchmark.json
@@ -437,70 +372,454 @@ dist/benchmark/benchmark.csv
 dist/benchmark/benchmark.md
 ```
 
-The benchmark uses temporary build directories and cleans those temporary
-component outputs after collection.
+The benchmark checks:
 
-### Host-tool syntax check
+- bootloader flash `<= 24 KiB`;
+- application flash `<= 38 KiB`;
+- SRAM `<= 20 KiB`;
+- raw delta savings `>= 20%`;
+- signed delta savings `>= 20%`;
+- signed full/delta artifacts fit the 128 KiB Incoming partition;
+- delta reconstruction is byte-for-byte correct;
+- recorded deterministic HIL evidence remains `9/9`.
 
-Compile-check the Python tooling without running the full firmware gate:
+Wall-clock build/signing times are reported but are not pass/fail thresholds because they depend on the host.
+
+Expected markers:
+
+```text
+BENCHMARK=PASS
+DELTA_SAVINGS=PASS
+HIL_EVIDENCE=PASS 9/9
+```
+
+## `make test`
+
+Alias of the integrated check:
+
+```bash
+make test TOOLCHAIN=gcc
+```
+
+Equivalent to:
+
+```bash
+make check TOOLCHAIN=gcc
+```
+
+## `make tools`
+
+Compile Python files under `tools/`, `server/` and `scripts/` to catch syntax/import-bytecode issues:
 
 ```bash
 make tools
 ```
 
-This covers:
+This is a lightweight smoke check. Use `make check` for the complete validation.
 
-```text
-tools/
-server/
-scripts/
-```
+## `make firmware`
 
-### Cleaning generated outputs
-
-Remove generated STM32, ESP32, benchmark and distribution outputs:
+Build both STM32 components:
 
 ```bash
-make clean
-```
-
-This removes the normal component `build/out` directories, HIL/benchmark
-build variants, ESP-IDF `build` and generated `sdkconfig` files,
-`.benchmark-tmp`, `build-host`, and `dist`.
-
-### Recommended command sequences
-
-For normal development:
-
-```bash
-make clean
-make check TOOLCHAIN=gcc
 make firmware TOOLCHAIN=gcc
 ```
 
-For a board programming session:
+Outputs:
 
-```bash
-make flash-combined TOOLCHAIN=gcc
-make dump-metadata
+```text
+node-stm32f103/bootloader/out/bootloader.elf
+node-stm32f103/bootloader/out/bootloader.bin
+node-stm32f103/bootloader/out/bootloader.hex
+node-stm32f103/bootloader/out/bootloader.map
+node-stm32f103/bootloader/out/bootloader.size.txt
+
+node-stm32f103/application/out/application.elf
+node-stm32f103/application/out/application.bin
+node-stm32f103/application/out/application.hex
+node-stm32f103/application/out/application.map
+node-stm32f103/application/out/application.size.txt
 ```
 
-For gateway development:
+This target only builds; it does not flash hardware.
+
+## `make bootloader`
+
+Build the STM32 bootloader only:
+
+```bash
+make bootloader TOOLCHAIN=gcc
+```
+
+The bootloader linker region is fixed at `0x08000000` with a 24 KiB flash budget.
+
+## `make application`
+
+Build the STM32 application only:
+
+```bash
+make application TOOLCHAIN=gcc
+```
+
+The application linker region begins at `0x08006000` with a 38 KiB flash budget.
+
+The default application version comes from the source configuration. Benchmark/release tooling can build explicit application versions through `PROJECT_CFLAGS`.
+
+## `make combined`
+
+Build bootloader + application and merge them into one binary:
+
+```bash
+make combined TOOLCHAIN=gcc
+```
+
+Outputs:
+
+```text
+dist/secure-delta-ota-combined.bin
+dist/secure-delta-ota-combined.txt
+```
+
+The combined image starts at `0x08000000`. Internal metadata pages are deliberately left erased for first-boot initialization.
+
+The packaged repository uses an unprovisioned trust anchor, so the merged image is a development/portfolio image until a trusted public key is provisioned.
+
+## `make toolchain-info`
+
+Show the selected STM32 compiler and bootloader linker/output paths:
+
+```bash
+make toolchain-info
+```
+
+or explicitly:
+
+```bash
+make toolchain-info TOOLCHAIN=gcc
+make toolchain-info TOOLCHAIN=clang
+```
+
+Typical output identifies the target, toolchain, compiler, linker script and ELF path.
+
+## `make gateway` / `make gateway-build`
+
+Activate ESP-IDF first:
 
 ```bash
 source ~/esp/esp-idf/export.sh
 make gateway
 ```
 
-For release qualification:
+`make gateway` delegates to `make gateway-build`.
+
+The target:
+
+1. verifies that `idf.py` is available;
+2. runs `scripts/esp32_build_guard.py`;
+3. runs `idf.py build` inside `gateway-esp32/`.
+
+Generated ESP-IDF output is under:
+
+```text
+gateway-esp32/build/
+```
+
+The build directory is intentionally ignored by repository presentation/security scans because it contains generated CMake/ESP-IDF metadata.
+
+## `make release`
+
+Create an immutable signed firmware release.
+
+Full + delta example:
+
+```bash
+make release \
+  TARGET=/path/to/application-v2.bin \
+  TARGET_VERSION=2 \
+  BASE=/path/to/application-v1.bin \
+  BASE_VERSION=1 \
+  SIGNING_KEY=/secure/path/release-signing.pem \
+  KEY_ID=0x15000001 \
+  BASE_URL=https://firmware.example \
+  CHANNEL=stable
+```
+
+Full-only example:
+
+```bash
+make release \
+  TARGET=/path/to/application-v2.bin \
+  TARGET_VERSION=2 \
+  SIGNING_KEY=/secure/path/release-signing.pem \
+  KEY_ID=0x15000001 \
+  BASE_URL=https://firmware.example
+```
+
+Make variables:
+
+| Variable | Required | Meaning |
+|---|---:|---|
+| `TARGET` | yes | Target application `.bin` |
+| `TARGET_VERSION` | yes | Target monotonic firmware version |
+| `SIGNING_KEY` | yes | External EC P-256 private key path |
+| `KEY_ID` | yes | Non-zero signing key identifier |
+| `BASE_URL` | yes | HTTPS URL used in release metadata |
+| `BASE` | optional | Exact previous application binary for delta generation |
+| `BASE_VERSION` | required with `BASE` | Version of the exact base binary |
+| `CHANNEL` | optional | `stable`, `beta` or `dev`; default `stable` |
+| `RELEASE_ROOT` | optional | Output root; default `dist/releases` |
+
+Security/release rules:
+
+- the private key must not be inside the repository;
+- key permissions must satisfy the release tool policy;
+- an existing immutable release directory is not overwritten;
+- a delta is included only when the configured savings policy passes;
+- a signed full-image fallback is always emitted.
+
+Typical release directory:
+
+```text
+dist/releases/fw-vN/
+├── application-vN.bin
+├── application-vN.full.sdot
+├── application-vBASE-to-vN.delta.sdot
+├── manifest.json
+├── manifest.json.sig
+├── signing-public.pem
+├── checksums.txt
+└── release-notes.md
+```
+
+## `make flash-bootloader`
+
+Build and program only the bootloader:
+
+```bash
+make flash-bootloader TOOLCHAIN=gcc
+```
+
+Requirements:
+
+- STM32 connected through ST-Link;
+- OpenOCD installed;
+- correct interface/target configuration.
+
+Optional environment overrides:
+
+```bash
+export OPENOCD=/usr/bin/openocd
+export OPENOCD_INTERFACE=interface/stlink.cfg
+export OPENOCD_TARGET=target/stm32f1x.cfg
+```
+
+The script programs `node-stm32f103/bootloader/out/bootloader.hex`, verifies it and resets the MCU.
+
+## `make flash-application`
+
+Build and program only the application:
+
+```bash
+make flash-application TOOLCHAIN=gcc
+```
+
+The application HEX is linked for `0x08006000`, so OpenOCD programs it at its linked address.
+
+## `make flash-combined`
+
+Build and flash the merged bootloader + application image:
+
+```bash
+make flash-combined TOOLCHAIN=gcc
+```
+
+The binary is programmed at:
+
+```text
+0x08000000
+```
+
+Use this for a clean development board baseline. The combined image does not provision a production trust key by itself.
+
+## `make dump-metadata`
+
+Read the two internal metadata pages through OpenOCD and decode them:
+
+```bash
+make dump-metadata
+```
+
+Output:
+
+```text
+dist/metadata-pages.bin
+```
+
+The script then runs:
+
+```text
+tools/inspect_metadata.py
+```
+
+This command is useful for debugging active/pending versions, update state, generation, boot attempts and diagnostic fields.
+
+## `make erase-metadata`
+
+Erase internal metadata A/B:
+
+```bash
+make erase-metadata
+```
+
+Affected internal flash range:
+
+```text
+0x0800F800 - 0x0800FFFF
+```
+
+**This command is destructive.** It resets boot/update metadata. It does not erase the bootloader or application regions, but it changes the persisted recovery state. Do not run it in the middle of a recovery experiment unless that reset is intentional.
+
+## `make hil-test`
+
+Run the deterministic physical fault-injection suite.
+
+Activate ESP-IDF and select STM32 OpenOCD first:
+
+```bash
+source ~/esp/esp-idf/export.sh
+
+export STM32_OPENOCD=/usr/bin/openocd
+export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+```
+
+Then run:
+
+```bash
+make hil-test \
+  TOOLCHAIN=gcc \
+  ESP32_PORT=/dev/ttyUSB0 \
+  WIFI_SSID="your-ssid" \
+  WIFI_PASSWORD="your-password" \
+  SDOTA_HOST_IP=<PC_LAN_IP>
+```
+
+Required/commonly used variables:
+
+| Variable | Required | Default / behavior |
+|---|---:|---|
+| `ESP32_PORT` | yes | ESP32 serial port; `PORT` is accepted as an alias |
+| `WIFI_SSID` | yes | Test Wi-Fi SSID |
+| `WIFI_PASSWORD` | network-dependent | Password; may be empty only for an open network |
+| `SDOTA_HOST_IP` | recommended | Auto-detected if omitted |
+| `HTTPS_PORT` | optional | `8443` |
+| `MQTT_PORT` | optional | `8883` |
+| `SDOTA_HIL_KEY_ID` | optional | `0xC0DE0001` |
+| `TOOLCHAIN` | optional | GCC preferred if installed, otherwise Clang |
+| `STM32_OPENOCD` | optional | Auto-detected; explicit value recommended on mixed OpenOCD hosts |
+| `STM32_OPENOCD_SCRIPTS` | optional | Auto-detected from common locations |
+
+The runner creates its signing key only in a temporary directory, provisions the corresponding public key for the test build, restores the repository files in `finally`, and removes temporary HIL builds/ESP-IDF generated files.
+
+The nine scenarios are:
+
+1. `control-secure-delta`
+2. `patch-reset`
+3. `backup-reset`
+4. `install-midpage-reset`
+5. `mqtt-drop-after-accepted`
+6. `https-truncate`
+7. `tampered-signature`
+8. `rollback-control`
+9. `rollback-reset`
+
+Expected final marker:
+
+```text
+HIL hardware test: PASS (9 deterministic scenarios)
+```
+
+Detailed expected invariants and the verified physical result are in `docs/hil-results.md`.
+
+## `make clean`
+
+Remove generated build/report output:
 
 ```bash
 make clean
+```
+
+It removes:
+
+- normal STM32 `build/` and `out/`;
+- temporary `build-*` / `out-*` STM32 directories;
+- `gateway-esp32/build/`;
+- ESP-IDF `sdkconfig` and `sdkconfig.old`;
+- benchmark scratch directory;
+- `dist/`;
+- `build-host/`.
+
+It does not delete source, checked-in benchmark references or documentation.
+
+---
+
+# Recommended workflows
+
+## 1. Fast source/documentation edit loop
+
+```bash
+python3 scripts/project_check.py --static-only
+make tools
+```
+
+## 2. Final host validation before commit
+
+```bash
+make warning-check TOOLCHAIN=gcc
 make check TOOLCHAIN=gcc
 make benchmark TOOLCHAIN=gcc
 ```
 
-For full hardware validation:
+If only LLVM is available:
+
+```bash
+make warning-check TOOLCHAIN=clang
+make check TOOLCHAIN=clang
+make benchmark TOOLCHAIN=clang
+```
+
+## 3. Build and flash a clean STM32 baseline
+
+```bash
+make flash-combined TOOLCHAIN=gcc
+```
+
+Then inspect metadata if needed:
+
+```bash
+make dump-metadata
+```
+
+## 4. Build the ESP32 gateway
+
+```bash
+source ~/esp/esp-idf/export.sh
+make gateway
+```
+
+## 5. Create a signed release
+
+```bash
+make release \
+  TARGET=/path/to/application-v2.bin \
+  TARGET_VERSION=2 \
+  BASE=/path/to/application-v1.bin \
+  BASE_VERSION=1 \
+  SIGNING_KEY=/secure/path/release-signing.pem \
+  KEY_ID=0x15000001 \
+  BASE_URL=https://firmware.example
+```
+
+## 6. Re-run full physical resilience validation
 
 ```bash
 source ~/esp/esp-idf/export.sh
@@ -515,23 +834,32 @@ make hil-test \
   SDOTA_HOST_IP=<PC_LAN_IP>
 ```
 
-## Benchmark
+---
 
-Run:
+# Benchmark results
 
-```bash
-make benchmark TOOLCHAIN=gcc
-```
+## Checked-in reproducible reference
 
-Outputs are written to:
+`benchmarks/reference.json` records a Clang/LLVM reference measurement:
 
-```text
-dist/benchmark/benchmark.json
-dist/benchmark/benchmark.csv
-dist/benchmark/benchmark.md
-```
+| Metric | Reference |
+|---|---:|
+| Bootloader flash | 11,400 B / 24,576 B (`46.39%`) |
+| Bootloader RAM | 2,072 B / 20,480 B (`10.12%`) |
+| Application v2 flash | 11,276 B / 38,912 B (`28.98%`) |
+| Application v2 RAM | 1,968 B / 20,480 B (`9.61%`) |
+| Raw delta | 970 B |
+| Raw delta savings | `91.40%` |
+| Signed delta | 1,174 B |
+| Signed full | 11,480 B |
+| Signed delta savings | `89.77%` |
+| HIL evidence | `9/9 PASS` |
 
-The last verified GCC hardware-project benchmark recorded:
+The reference also stores environment metadata and informational wall-clock timings.
+
+## User-verified GCC measurement
+
+A later local GCC benchmark produced:
 
 ```text
 Bootloader flash        9412 B
@@ -544,57 +872,41 @@ Signed delta savings     85.32%
 HIL evidence             9/9 PASS
 ```
 
-Exact footprint and timing values can vary by compiler/toolchain version. Partition limits and delta-efficiency policies are checked automatically.
+The difference between GCC and Clang is expected because code generation and linker behavior differ. Both measurements remain comfortably inside the fixed partitions and both satisfy the minimum delta-savings policy.
 
-## Deterministic hardware-in-the-loop test
-
-The HIL runner executes nine scenarios:
-
-1. secure delta control update;
-2. reset during patch reconstruction;
-3. reset during backup;
-4. reset during internal-flash install;
-5. MQTT disconnect after command acceptance;
-6. truncated HTTPS transfer;
-7. tampered ECDSA signature;
-8. automatic rollback control;
-9. reset during rollback.
-
-Run on connected hardware:
+For the current checkout, always prefer a freshly generated:
 
 ```bash
-source ~/esp/esp-idf/export.sh
-
-export STM32_OPENOCD=/usr/bin/openocd
-export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
-
-make hil-test \
-  ESP32_PORT=/dev/ttyUSB0 \
-  WIFI_SSID="your-ssid" \
-  WIFI_PASSWORD="your-password" \
-  SDOTA_HOST_IP=<PC_LAN_IP>
+make benchmark TOOLCHAIN=gcc
 ```
 
-The verified hardware result is documented in `docs/hil-results.md`.
+over copying an old size number into a new report.
 
-## Release generation
+# Hardware validation summary
 
-Example:
+The deterministic HIL suite has recorded **9/9 PASS** on the STM32F103 + ESP32 + W25Q setup.
 
-```bash
-make release \
-  TARGET=path/to/application-v2.bin \
-  TARGET_VERSION=2 \
-  BASE=path/to/application-v1.bin \
-  BASE_VERSION=1 \
-  SIGNING_KEY=/secure/path/release-key.pem \
-  KEY_ID=0x15000001 \
-  BASE_URL=https://firmware.example
+Final rollback-reset state:
+
+```text
+generation=74
+state=IDLE
+active_version=1
+pending_version=0
+boot_attempts=0
+last_error=0x0008B003
+application=v1 byte-for-byte verified
 ```
 
-The release tool chooses a delta only when it satisfies the configured savings policy and always emits a signed full-image fallback.
+The diagnostic is intentionally preserved after successful recovery.
 
-## Repository map
+See:
+
+- `docs/hil-results.md`
+- `VALIDATION.md`
+- `docs/results-report.md`
+
+# Repository map
 
 ```text
 node-stm32f103/bootloader/   Secure bootloader, patch/install/rollback logic
@@ -606,31 +918,101 @@ server/                      Release server, manifest and MQTT publisher
 tools/                       Signing, delta, release and inspection tools
 scripts/                     Build/check/benchmark/HIL automation
 tests/                       Host/unit/fault test assets
-benchmarks/                  Checked-in reference benchmark
-docs/                        Architecture, protocol, HIL and portfolio docs
+benchmarks/                  Checked-in reproducible benchmark reference
+docs/                        Architecture, protocol, HIL, usage and portfolio docs
 ```
 
-## Portfolio evidence
+# Reports and evidence
 
-Start with:
+The project contains both a high-level report and detailed evidence documents:
 
-- `docs/portfolio-one-page.md`
-- `docs/portfolio-demo.md`
-- `docs/portfolio-evidence.md`
-- `docs/hil-results.md`
-- `benchmarks/reference.md`
-- `PROJECT_REPORT.md`
-- `VALIDATION.md`
+| File | Purpose |
+|---|---|
+| `PROJECT_REPORT.md` | Full engineering report: objective, architecture, protocols, security, recovery, release flow and results |
+| `VALIDATION.md` | Detailed verification matrix, pass criteria, reproduced commands and known boundaries |
+| `docs/results-report.md` | Consolidated benchmark + hardware result report |
+| `docs/hil-results.md` | Nine-scenario physical fault matrix and final hardware state |
+| `docs/benchmark-portfolio.md` | Benchmark method, thresholds and interpretation |
+| `benchmarks/reference.md` | Checked-in reference benchmark |
+| `benchmarks/reference.json` | Machine-readable reference benchmark |
+| `docs/portfolio-evidence.md` | Claim-to-evidence mapping |
+| `docs/portfolio-one-page.md` | One-page portfolio summary |
+| `docs/portfolio-demo.md` | Suggested live/demo presentation flow |
+| `docs/make-command-reference.md` | Dedicated full Make command reference |
 
-## Verified status
+# Troubleshooting
 
-The integrated project has passed:
+## `idf.py not found`
 
-- secure release and signed-container host validation;
-- STM32 flash/RAM budget checks;
-- deterministic delta round-trip checks;
-- packaging checks for unprovisioned trust anchor and absent private credentials;
-- full deterministic HIL fault matrix: **9/9 PASS**;
-- final rollback-reset state restoring confirmed application v1.
+Activate ESP-IDF:
 
-The project is therefore presented as a completed secure delta OTA reference implementation and portfolio artifact.
+```bash
+source ~/esp/esp-idf/export.sh
+```
+
+Then retry:
+
+```bash
+make gateway
+```
+
+## Wrong OpenOCD is selected
+
+On machines with both STM32 OpenOCD and Espressif OpenOCD, set the STM32 paths explicitly for HIL:
+
+```bash
+export STM32_OPENOCD=/usr/bin/openocd
+export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+```
+
+For the simple flash scripts, use:
+
+```bash
+export OPENOCD=/usr/bin/openocd
+```
+
+## `make check` sees generated ESP-IDF files
+
+The checker intentionally ignores generated directories such as `gateway-esp32/build/`, `dist/`, cache directories and temporary build/output directories. If a generated file is reported as first-party source, verify that you are using the current `scripts/project_check.py`.
+
+## STM32 compiler not found
+
+Check:
+
+```bash
+make toolchain-info TOOLCHAIN=gcc
+```
+
+If GNU Arm GCC is not installed, either install it or use:
+
+```bash
+make toolchain-info TOOLCHAIN=clang
+```
+
+## HIL cannot find the ESP32 serial port
+
+Inspect `/dev/ttyUSB*` or a stable `/dev/serial/by-id/...` path, reconnect the USB UART if needed, and pass the detected path as `ESP32_PORT`.
+
+## Release command rejects the private key
+
+This is deliberate. The signing key must stay outside the repository and satisfy the file-permission policy. Do not weaken the release tool to accept an in-tree private key.
+
+## Why the packaged firmware cannot accept production releases immediately
+
+The repository intentionally contains an unprovisioned public-key trust anchor. Provision the expected public key/key ID in a controlled build before using the secure update path in a production deployment.
+
+# Portfolio evidence
+
+Recommended reading order:
+
+1. `docs/portfolio-one-page.md`
+2. `PROJECT_REPORT.md`
+3. `docs/architecture.md`
+4. `docs/firmware-container.md`
+5. `docs/uart-ota-protocol.md`
+6. `docs/hil-results.md`
+7. `docs/results-report.md`
+8. `VALIDATION.md`
+9. `docs/portfolio-evidence.md`
+
+The project is presented as a completed secure delta OTA reference implementation and hardware-validated portfolio artifact.
