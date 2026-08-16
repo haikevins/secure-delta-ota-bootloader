@@ -940,67 +940,6 @@ The project contains both a high-level report and detailed evidence documents:
 | `docs/portfolio-demo.md` | Suggested live/demo presentation flow |
 | `docs/make-command-reference.md` | Dedicated full Make command reference |
 
-# Troubleshooting
-
-## `idf.py not found`
-
-Activate ESP-IDF:
-
-```bash
-source ~/esp/esp-idf/export.sh
-```
-
-Then retry:
-
-```bash
-make gateway
-```
-
-## Wrong OpenOCD is selected
-
-On machines with both STM32 OpenOCD and Espressif OpenOCD, set the STM32 paths explicitly for HIL:
-
-```bash
-export STM32_OPENOCD=/usr/bin/openocd
-export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
-```
-
-For the simple flash scripts, use:
-
-```bash
-export OPENOCD=/usr/bin/openocd
-```
-
-## `make check` sees generated ESP-IDF files
-
-The checker intentionally ignores generated directories such as `gateway-esp32/build/`, `dist/`, cache directories and temporary build/output directories. If a generated file is reported as first-party source, verify that you are using the current `scripts/project_check.py`.
-
-## STM32 compiler not found
-
-Check:
-
-```bash
-make toolchain-info TOOLCHAIN=gcc
-```
-
-If GNU Arm GCC is not installed, either install it or use:
-
-```bash
-make toolchain-info TOOLCHAIN=clang
-```
-
-## HIL cannot find the ESP32 serial port
-
-Inspect `/dev/ttyUSB*` or a stable `/dev/serial/by-id/...` path, reconnect the USB UART if needed, and pass the detected path as `ESP32_PORT`.
-
-## Release command rejects the private key
-
-This is deliberate. The signing key must stay outside the repository and satisfy the file-permission policy. Do not weaken the release tool to accept an in-tree private key.
-
-## Why the packaged firmware cannot accept production releases immediately
-
-The repository intentionally contains an unprovisioned public-key trust anchor. Provision the expected public key/key ID in a controlled build before using the secure update path in a production deployment.
-
 # Portfolio evidence
 
 Recommended reading order:
