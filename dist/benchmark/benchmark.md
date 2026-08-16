@@ -34,10 +34,10 @@
 
 | Operation | Wall time |
 |---|---:|
-| Bootloader build | 3.540 s |
-| App v1 build | 2.852 s |
-| App v2 build | 2.956 s |
-| Delta generate + round-trip | 0.800 s |
-| Signed release generation | 0.895 s |
+| Bootloader build | 3.147 s |
+| App v1 build | 4.982 s |
+| App v2 build | 4.172 s |
+| Delta generate + round-trip | 0.591 s |
+| Signed release generation | 0.822 s |
 
 These wall-clock timings are informational and intentionally have no PASS/FAIL threshold.

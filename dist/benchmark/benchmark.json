@@ -13,8 +13,8 @@
     "target_sha256": "93d2129b7caa23bf6f40a2c47222329200c0bdc462cd09e3841c528c3759a88b"
   },
   "codebase": {
-    "files": 215,
-    "nonblank_lines": 26366
+    "files": 410,
+    "nonblank_lines": 57878
   },
   "environment": {
     "platform": "Linux-7.0.0-28-generic-x86_64-with-glibc2.39",
@@ -77,10 +77,10 @@
     }
   },
   "timing_seconds": {
-    "application_v1_build": 2.852,
-    "application_v2_build": 2.956,
-    "bootloader_build": 3.54,
-    "delta_roundtrip": 0.8,
-    "signed_release": 0.895
+    "application_v1_build": 4.982,
+    "application_v2_build": 4.172,
+    "bootloader_build": 3.147,
+    "delta_roundtrip": 0.591,
+    "signed_release": 0.822
   }
 }

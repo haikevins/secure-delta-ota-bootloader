@@ -1,5 +1,11 @@
 .github/workflows/build.yml
+.github/workflows/build.yml
+.github/workflows/build.yml
 .github/workflows/firmware-release.yml
+.github/workflows/firmware-release.yml
+.github/workflows/firmware-release.yml
+.github/workflows/test.yml
+.github/workflows/test.yml
 .github/workflows/test.yml
 .gitignore
 FILES.txt
@@ -7,6 +13,8 @@ LICENSE
 Makefile
 PROJECT_REPORT.md
 README.md
+SHA256SUMS.txt
+SHA256SUMS.txt
 SHA256SUMS.txt
 VALIDATION.md
 benchmarks/README.md
@@ -88,6 +96,7 @@ gateway-esp32/main/idf_component.yml
 gateway-esp32/main/include/gateway_config.h
 gateway-esp32/main/include/gateway_manager.h
 gateway-esp32/main/include/runtime_config.h
+gateway-esp32/main/test_ca.pem
 gateway-esp32/managed_components/espressif__cjson/.component_hash
 gateway-esp32/managed_components/espressif__cjson/CHECKSUMS.json
 gateway-esp32/managed_components/espressif__cjson/CMakeLists.txt
@@ -304,6 +313,7 @@ gateway-esp32/managed_components/espressif__mqtt/examples/ssl/main/CMakeLists.tx
 gateway-esp32/managed_components/espressif__mqtt/examples/ssl/main/Kconfig.projbuild
 gateway-esp32/managed_components/espressif__mqtt/examples/ssl/main/app_main.c
 gateway-esp32/managed_components/espressif__mqtt/examples/ssl/main/idf_component.yml
+gateway-esp32/managed_components/espressif__mqtt/examples/ssl/main/mqtt_eclipseprojects_io.pem
 gateway-esp32/managed_components/espressif__mqtt/examples/ssl/pytest_mqtt_ssl.py
 gateway-esp32/managed_components/espressif__mqtt/examples/ssl/sdkconfig.ci
 gateway-esp32/managed_components/espressif__mqtt/examples/ssl_ds/CMakeLists.txt
@@ -357,6 +367,7 @@ gateway-esp32/managed_components/espressif__mqtt/examples/wss/main/CMakeLists.tx
 gateway-esp32/managed_components/espressif__mqtt/examples/wss/main/Kconfig.projbuild
 gateway-esp32/managed_components/espressif__mqtt/examples/wss/main/app_main.c
 gateway-esp32/managed_components/espressif__mqtt/examples/wss/main/idf_component.yml
+gateway-esp32/managed_components/espressif__mqtt/examples/wss/main/mqtt_eclipseprojects_io.pem
 gateway-esp32/managed_components/espressif__mqtt/examples/wss/pytest_mqtt_wss_example.py
 gateway-esp32/managed_components/espressif__mqtt/examples/wss/sdkconfig.ci
 gateway-esp32/managed_components/espressif__mqtt/idf_component.yml
@@ -411,6 +422,7 @@ gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/
 gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/main/Kconfig.projbuild
 gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/main/connect_test.c
 gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/main/idf_component.yml
+gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/main/mqtt_eclipseprojects_io.pem
 gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/main/publish_connect_test.c
 gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/main/publish_connect_test.h
 gateway-esp32/managed_components/espressif__mqtt/test/apps/publish_connect_test/main/publish_test.c
@@ -629,6 +641,8 @@ scripts/flash_bootloader.sh
 scripts/flash_combined.sh
 scripts/gateway_hil_support.py
 scripts/hil_test.py
+scripts/project_check.py
+scripts/project_check.py
 scripts/project_check.py
 scripts/release_hil_support.py
 scripts/run_tests.sh
