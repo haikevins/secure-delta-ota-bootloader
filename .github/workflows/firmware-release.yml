@@ -36,6 +36,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi openssl
+      - name: Warning-clean STM32 build
+        run: make warning-check TOOLCHAIN=gcc
       - name: Validate repository and release tooling
         run: make check TOOLCHAIN=gcc
 

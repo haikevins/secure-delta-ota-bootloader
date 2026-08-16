@@ -393,6 +393,77 @@ def validate_source_contracts() -> None:
     print("SOURCE_CONTRACTS=PASS secure_delta_recovery_gateway")
 
 
+def validate_documentation_contracts() -> None:
+    required = (
+        "README.md",
+        "PROJECT_REPORT.md",
+        "VALIDATION.md",
+        "docs/make-command-reference.md",
+        "docs/results-report.md",
+        "docs/hil-results.md",
+        "docs/benchmark-portfolio.md",
+        "docs/portfolio-evidence.md",
+    )
+    missing = [rel for rel in required if not (ROOT / rel).is_file()]
+    if missing:
+        raise CheckError(
+            "documentation deliverable missing: " + ", ".join(missing)
+        )
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    command_reference = (
+        ROOT / "docs/make-command-reference.md"
+    ).read_text(encoding="utf-8")
+
+    public_targets = (
+        "help",
+        "check",
+        "warning-check",
+        "benchmark",
+        "hil-test",
+        "firmware",
+        "bootloader",
+        "application",
+        "combined",
+        "gateway",
+        "gateway-build",
+        "release",
+        "flash-bootloader",
+        "flash-application",
+        "flash-combined",
+        "dump-metadata",
+        "erase-metadata",
+        "toolchain-info",
+        "tools",
+        "test",
+        "clean",
+    )
+
+    for target in public_targets:
+        if f"{target}:" not in makefile:
+            raise CheckError(f"Makefile target missing: {target}")
+        token = f"make {target}"
+        if token not in readme and token not in command_reference:
+            raise CheckError(
+                f"public make target undocumented: {target}"
+            )
+
+    for stale in (
+        "make external-flash integration-check",
+        "make external-flash integration-hw-test",
+        "make TOOLCHAIN=gcc boot metadata-check",
+        "make TOOLCHAIN=clang boot metadata-check",
+    ):
+        for rel in ("README.md", "docs/make-command-reference.md"):
+            if stale in (ROOT / rel).read_text(encoding="utf-8"):
+                raise CheckError(
+                    f"stale command remains in {rel}: {stale}"
+                )
+
+    print("DOCUMENTATION_CONTRACTS=PASS make_targets reports")
+
+
 def validate_automation_contracts() -> None:
     build = (
         ROOT / ".github/workflows/build.yml"
@@ -404,13 +475,22 @@ def validate_automation_contracts() -> None:
         ROOT / ".github/workflows/firmware-release.yml"
     ).read_text(encoding="utf-8")
 
-    for token in ("make check TOOLCHAIN=gcc", "make benchmark TOOLCHAIN=gcc"):
+    for token in (
+        "make warning-check TOOLCHAIN=gcc",
+        "make check TOOLCHAIN=gcc",
+        "make benchmark TOOLCHAIN=gcc",
+    ):
         if token not in build:
             raise CheckError(f"build workflow missing: {token}")
     for token in ("scripts/project_check.py", "scripts/benchmark.py", "scripts/hil_test.py"):
         if token not in tests:
             raise CheckError(f"host-test workflow missing: {token}")
-    for token in ("make check TOOLCHAIN=gcc", "tools/release.py", "SIGNING_KEY_PEM"):
+    for token in (
+        "make warning-check TOOLCHAIN=gcc",
+        "make check TOOLCHAIN=gcc",
+        "tools/release.py",
+        "SIGNING_KEY_PEM",
+    ):
         if token not in release:
             raise CheckError(f"release workflow missing: {token}")
 
@@ -538,6 +618,7 @@ def main() -> int:
         validate_reference_benchmark()
         validate_security_boundary()
         validate_source_contracts()
+        validate_documentation_contracts()
         validate_automation_contracts()
         validate_python()
 

@@ -1,6 +1,6 @@
 # Firmware Release Process
 
-Status: release pipeline implemented.
+Status: signed immutable release pipeline implemented and validated.
 
 ```text
 Build target application.bin

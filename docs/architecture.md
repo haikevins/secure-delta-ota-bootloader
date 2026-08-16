@@ -1,6 +1,6 @@
 # System Architecture Specification
 
-Status: **Frozen through external-flash integration**
+Status: **Integrated architecture implemented and hardware-validated**
 
 ## 1. Objective
 
@@ -137,13 +137,14 @@ Use delta only when all conditions are true:
 
 Otherwise, use the full container.
 
-## 7. initial scaffold acceptance
+## 7. Architecture acceptance
 
 - Hardware, memory and protocol decisions are explicitly documented.
 - No internal or external partition overlaps.
-- UART packet fields and state rules are frozen at protocol version 1.
-- Boot/update transitions and power-loss behavior are documented.
+- UART packet fields and state rules are fixed at protocol version 1.
+- Boot/update transitions and power-loss behavior are implemented and documented.
 - Security trust boundary and out-of-scope items are documented.
+- Deterministic physical fault testing records 9/9 PASS.
 
 
 ## signed secure container trust-boundary update

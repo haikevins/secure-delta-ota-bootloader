@@ -24,12 +24,14 @@ docs/diagrams/update-flow.mmd
 docs/external-spi-flash.md
 docs/firmware-container.md
 docs/hil-results.md
+docs/make-command-reference.md
 docs/memory-map.md
 docs/metadata-and-boot-decision.md
 docs/portfolio-demo.md
 docs/portfolio-evidence.md
 docs/portfolio-one-page.md
 docs/release-process.md
+docs/results-report.md
 docs/test-plan.md
 docs/threat-model.md
 docs/toolchain-selection.md
