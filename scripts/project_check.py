@@ -38,6 +38,50 @@ FIRST_PARTY_EXCLUDES = (
     "node-stm32f103/spl/",
 )
 
+# Generated outputs are deliberately excluded from repository-presentation and
+# secret scans. They are not first-party source and may contain strings copied
+# from toolchains, CMake/ESP-IDF hints, compiler metadata, or earlier build
+# command lines.
+GENERATED_PATH_PARTS = {
+    ".git",
+    ".benchmark-tmp",
+    ".cache",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "build",
+    "build-host",
+    "dist",
+    "managed_components",
+    "out",
+}
+
+GENERATED_FILE_NAMES = {
+    "dependencies.lock",
+    "sdkconfig",
+    "sdkconfig.old",
+}
+
+
+def is_generated_or_excluded(path: Path) -> bool:
+    rel = path.relative_to(ROOT)
+    rel_posix = rel.as_posix()
+
+    if rel_posix.startswith(FIRST_PARTY_EXCLUDES):
+        return True
+
+    if rel.name in GENERATED_FILE_NAMES:
+        return True
+
+    for part in rel.parts:
+        if part in GENERATED_PATH_PARTS:
+            return True
+        if part.startswith("build-") or part.startswith("out-"):
+            return True
+
+    return False
+
 PYTHON_FILES = [
     "scripts/project_check.py",
     "scripts/benchmark.py",
@@ -144,7 +188,7 @@ def validate_product_presentation() -> None:
         if not path.is_file():
             continue
         rel = path.relative_to(ROOT).as_posix()
-        if rel.startswith(FIRST_PARTY_EXCLUDES):
+        if is_generated_or_excluded(path):
             continue
         legacy_stage_word = "ph" + "ase"
         if legacy_stage_word in path.name.lower():
@@ -171,7 +215,7 @@ def validate_product_presentation() -> None:
         if token not in readme:
             raise CheckError(f"README missing integrated project claim: {token}")
 
-    print("PROJECT_PRESENTATION=PASS product_layout=clean")
+    print("PROJECT_PRESENTATION=PASS product_layout=clean generated_artifacts=ignored")
 
 
 def validate_hardware_evidence() -> None:
@@ -281,13 +325,7 @@ def validate_security_boundary() -> None:
         if not path.is_file():
             continue
         rel = path.relative_to(ROOT)
-        if any(
-            part == ".git"
-            or part.startswith("build-")
-            or part.startswith("out-")
-            or part == "dist"
-            for part in rel.parts
-        ):
+        if is_generated_or_excluded(path):
             continue
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")

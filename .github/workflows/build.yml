@@ -1,15 +1,23 @@
-name: Build
-on: [push, pull_request, workflow_dispatch]
+name: Build and Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  stm32-phase17:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - run: |
+      - uses: actions/checkout@v4
+      - name: Install STM32 toolchain and OpenSSL
+        run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi openssl
-      - run: make phase17-check TOOLCHAIN=gcc
+      - name: Run integrated project checks
+        run: make check TOOLCHAIN=gcc
+      - name: Run reproducible benchmark
+        run: make benchmark TOOLCHAIN=gcc

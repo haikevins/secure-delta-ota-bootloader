@@ -1,38 +1,20 @@
-name: Test
-on: [push, pull_request, workflow_dispatch]
+name: Host Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  host-security-release-regressions:
+  python-and-host-contracts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Python syntax and JojoDiff regression
+      - uses: actions/checkout@v4
+      - name: Python syntax
         run: |
-          python3 -m py_compile \
-            tools/phase14_keytool.py \
-            tools/phase14_secure_container.py \
-            tools/phase15_release.py \
-            server/app/main.py \
-            server/app/services/*.py \
-            scripts/phase15_check.py \
-            scripts/phase15_hw_test.py \
-            scripts/phase16_check.py \
-            scripts/phase16_hw_test.py \
-            tools/phase16_mqtt_broker.py \
-            tools/phase16_fault_https_server.py \
-            scripts/phase17_benchmark.py \
-            scripts/phase17_check.py
-          python3 tests/unit/test_phase12_jojodiff.py
-      - name: ESP32 secure-container UART contract
-        run: |
-          cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror \
-            -Igateway-esp32/components/secure_container_meta/include \
-            -Igateway-esp32/components/uart_ota/include \
-            gateway-esp32/components/secure_container_meta/secure_container_meta.c \
-            gateway-esp32/components/uart_ota/uart_ota_protocol.c \
-            tests/host/test_phase15_gateway_contract.c \
-            -o /tmp/phase15_gateway_contract
-          /tmp/phase15_gateway_contract
+          python3 -m py_compile             scripts/project_check.py             scripts/benchmark.py             scripts/hil_test.py             scripts/gateway_hil_support.py             scripts/security_hil_support.py             scripts/release_hil_support.py             tools/release.py             tools/secure_container.py             tools/keytool.py             tools/delta.py             tools/delta_artifact.py             tools/mqtt_protocol.py             tools/mqtt_test_broker.py             tools/fault_https_server.py             server/app/main.py             server/app/services/*.py
+      - name: Static project closure
+        run: python3 scripts/project_check.py --static-only

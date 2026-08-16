@@ -1,6 +1,8 @@
 # Build outputs
 build/
 out/
+build-*/
+out-*/
 *.elf
 *.hex
 *.bin
@@ -8,6 +10,11 @@ out/
 *.lst
 *.o
 *.d
+
+# Generated artifacts
+dist/
+.benchmark-tmp/
+build-host/
 
 # ESP-IDF
 sdkconfig
@@ -22,7 +29,6 @@ venv/
 
 # Keys and secrets
 keys/
-*.pem
 *.key
 *.crt
 .env

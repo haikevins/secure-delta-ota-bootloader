@@ -67,6 +67,7 @@ typedef struct
     uint8_t is_delta;
 } CandidateSource_t;
 
+#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
 static uint8_t FullRecordMatchesMetadata(
     const UpdateHandoffRecord_t *record,
     const BootMetadata_t *metadata)
@@ -77,6 +78,7 @@ static uint8_t FullRecordMatchesMetadata(
         (record->image_size == metadata->expected_size) &&
         (metadata->received_size == metadata->expected_size));
 }
+#endif
 
 static ImageInstallerStatus_t LoadCandidateSource(
     const BootMetadata_t *metadata,
