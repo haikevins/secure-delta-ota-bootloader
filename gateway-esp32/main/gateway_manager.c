@@ -134,19 +134,35 @@ static esp_err_t PublishFailure(MqttOrchestrator_t *mqtt,
         (command != NULL) ? command->update_id : 0UL;
     const uint32_t target_version =
         (command != NULL) ? command->target_version : 0UL;
+    esp_err_t publish_status;
 
     ESP_LOGE(TAG,
              "Phase-11 update failed: %s (%s)",
              detail,
              esp_err_to_name(error));
 
-    (void)MqttOrchestrator_PublishStatus(
+    /*
+     * Final failure is durable orchestration state, just like "confirmed".
+     * Wait for the QoS-1 PUBACK before single-shot teardown so a fast STM32
+     * security rejection cannot race MqttOrchestrator_Stop().
+     *
+     * Preserve the original OTA error as the function result; failure to
+     * report telemetry must never rewrite the root-cause error.
+     */
+    publish_status = MqttOrchestrator_PublishStatusAndWait(
         mqtt,
         "failed",
         update_id,
         target_version,
         detail,
-        true);
+        true,
+        5000UL);
+    if (publish_status != ESP_OK)
+    {
+        ESP_LOGW(TAG,
+                 "failed-status PUBACK wait failed: %s",
+                 esp_err_to_name(publish_status));
+    }
 
     return error;
 }

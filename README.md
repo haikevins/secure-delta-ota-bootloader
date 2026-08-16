@@ -22,7 +22,8 @@ STM32 uses **Standard Peripheral Library + CMSIS**, not HAL. ESP32 uses
 - Phase 12 — Delta patch generation: complete + host verified.
 - Phase 13 — STM32 delta patching: complete + hardware verified.
 - Phase 14 — Secure container/signature: complete + hardware verified.
-- Phase 15 — Server and release pipeline: implemented + host/server/security validation; physical end-to-end HIL pending.
+- Phase 15 — Server and release pipeline: complete + hardware verified.
+- Phase 16 — Fault injection and HIL: implemented + host/static/fault-build verified; physical 9-scenario HIL pending.
 
 ## Phase 11 pipeline
 
@@ -260,3 +261,54 @@ See:
 - `docs/phase-15-server-release-pipeline.md`
 - `docs/phase-15-checklist.md`
 - `PHASE15_REPORT.md`
+
+## Phase 16 fault injection and HIL
+
+Phase 16 stress-tests the complete Phase-15 secure release path with
+deterministic reset, transport, authentication and rollback faults.
+
+The machine-readable matrix contains nine scenarios:
+
+```text
+control-secure-delta
+patch-reset
+backup-reset
+install-midpage-reset
+mqtt-drop-after-accepted
+https-truncate
+tampered-signature
+rollback-control
+rollback-reset
+```
+
+Host/static validation:
+
+```bash
+make phase16-check
+```
+
+Physical fault matrix:
+
+```bash
+source ~/esp/esp-idf/export.sh
+export STM32_OPENOCD=/usr/bin/openocd
+export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+
+make phase16-hw-test \
+  ESP32_PORT=/dev/ttyUSB0 \
+  WIFI_SSID="your-ssid" \
+  WIFI_PASSWORD="your-password" \
+  PHASE16_HOST_IP=<PC_LAN_IP>
+```
+
+The HIL runner starts every scenario from a fresh v1 baseline, uses signed SDOT
+releases, and verifies STM32 metadata plus application bytes after each fault.
+Reset scenarios use persistent checkpoint witnesses so the test can prove that
+the requested fault actually executed.
+
+See:
+
+- `docs/phase-16-fault-injection-hil.md`
+- `docs/phase-16-checklist.md`
+- `PHASE16_REPORT.md`
+

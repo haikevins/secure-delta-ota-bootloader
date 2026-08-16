@@ -153,3 +153,31 @@ P15_WIFI_PS=PASS mode=none
 This is a reliability policy for the OTA gateway: during secure update
 transport, predictable ARP/TCP/TLS startup is preferred over modem power
 savings.
+
+## Final physical HIL result
+
+The final Phase-15 run completed the production-shaped path on the ESP32 and
+STM32 hardware without host-side keepalive traffic:
+
+```text
+P15_WIFI_PS=PASS mode=none
+P11_MQTT=PASS
+P11_COMMAND=PASS
+P11_HTTPS=PASS
+P11_UART_DATA 1446/1446
+INSTALL ACK received
+candidate v2 observed in TRIAL_BOOT
+target v2 confirmed after trial
+P11_FINAL=PASS app=v2 state=IDLE
+P11_PIPELINE=PASS
+P11_GATEWAY_HW_TEST=PASS
+P11_BROKER_RESULT=PASS
+P15_HTTPS_RELEASE_GET=PASS
+P15_RELEASE_PIPELINE=PASS
+Phase 15 server/release pipeline hardware test: PASS
+```
+
+The final STM32 metadata was `IDLE`, active version v2, no pending update, zero
+boot attempts and `last_error == 0`. The installed candidate also passed
+byte-for-byte verification. Phase 15 is therefore complete + hardware
+verified.

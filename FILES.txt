@@ -46,6 +46,8 @@ PHASE14_REPORT.md
 PHASE14_VALIDATION.txt
 PHASE15_REPORT.md
 PHASE15_VALIDATION.txt
+PHASE16_REPORT.md
+PHASE16_VALIDATION.txt
 PHASE1_REPORT.md
 PHASE2_REPORT.md
 PHASE3_REPORT.md
@@ -117,6 +119,8 @@ docs/phase-14-checklist.md
 docs/phase-14-secure-container.md
 docs/phase-15-checklist.md
 docs/phase-15-server-release-pipeline.md
+docs/phase-16-checklist.md
+docs/phase-16-fault-injection-hil.md
 docs/phase-2-checklist.md
 docs/phase-3-checklist.md
 docs/phase-4-checklist.md
@@ -240,21 +244,6 @@ node-stm32f103/application/out-phase13-target/application.elf
 node-stm32f103/application/out-phase13-target/application.hex
 node-stm32f103/application/out-phase13-target/application.map
 node-stm32f103/application/out-phase13-target/application.size.txt
-node-stm32f103/application/out-phase14-v1/application.bin
-node-stm32f103/application/out-phase14-v1/application.elf
-node-stm32f103/application/out-phase14-v1/application.hex
-node-stm32f103/application/out-phase14-v1/application.map
-node-stm32f103/application/out-phase14-v1/application.size.txt
-node-stm32f103/application/out-phase14-v2/application.bin
-node-stm32f103/application/out-phase14-v2/application.elf
-node-stm32f103/application/out-phase14-v2/application.hex
-node-stm32f103/application/out-phase14-v2/application.map
-node-stm32f103/application/out-phase14-v2/application.size.txt
-node-stm32f103/application/out-phase14-v3/application.bin
-node-stm32f103/application/out-phase14-v3/application.elf
-node-stm32f103/application/out-phase14-v3/application.hex
-node-stm32f103/application/out-phase14-v3/application.map
-node-stm32f103/application/out-phase14-v3/application.size.txt
 node-stm32f103/application/out-phase4-check/application.bin
 node-stm32f103/application/out-phase4-check/application.elf
 node-stm32f103/application/out-phase4-check/application.hex
@@ -485,6 +474,8 @@ scripts/phase14_check.py
 scripts/phase14_hw_test.py
 scripts/phase15_check.py
 scripts/phase15_hw_test.py
+scripts/phase16_check.py
+scripts/phase16_hw_test.py
 scripts/phase1_check.py
 scripts/phase2_check.py
 scripts/phase3_check.py
@@ -553,6 +544,7 @@ shared/src/install_progress.c
 shared/src/sha256.c
 shared/src/update_handoff.c
 tests/fault-injection/.gitkeep
+tests/fault/phase16_fault_matrix.json
 tests/firmware-images/.gitkeep
 tests/hardware-in-loop/.gitkeep
 tests/host/phase12_jojo_subset_apply.c
@@ -606,6 +598,8 @@ tools/phase13_delta_artifact.py
 tools/phase14_keytool.py
 tools/phase14_secure_container.py
 tools/phase15_release.py
+tools/phase16_fault_https_server.py
+tools/phase16_mqtt_broker.py
 tools/power_cut_test.py
 tools/requirements-phase5.txt
 tools/sign_container.py

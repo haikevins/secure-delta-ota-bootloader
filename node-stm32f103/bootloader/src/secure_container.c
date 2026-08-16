@@ -14,6 +14,10 @@
 #include "phase14_trusted_key.h"
 #include "sha256.h"
 
+#if defined(PHASE16_FAULT_PATCH_RESET)
+#include "stm32f10x.h"
+#endif
+
 #define SECURE_IO_BUFFER_SIZE 256UL
 
 static uint8_t BytesEqual(const uint8_t *left,
@@ -47,6 +51,32 @@ static MetadataStorageStatus_t CommitMetadata(BootMetadata_t *metadata)
 
     return status;
 }
+
+
+#define PHASE16_FAULT_PATCH_MARKER 0xF0160001UL
+
+#if defined(PHASE16_FAULT_PATCH_RESET)
+static SecureContainerStatus_t Phase16InjectPatchReset(
+    BootMetadata_t *metadata)
+{
+    if (metadata->last_error == PHASE16_FAULT_PATCH_MARKER)
+    {
+        return SECURE_CONTAINER_OK;
+    }
+
+    metadata->last_error = PHASE16_FAULT_PATCH_MARKER;
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return SECURE_CONTAINER_METADATA_COMMIT_FAILED;
+    }
+
+    NVIC_SystemReset();
+    for (;;)
+    {
+        __NOP();
+    }
+}
+#endif
 
 static void CopyResult(const BootMetadata_t *metadata,
                        BootMetadata_t *result_metadata)
@@ -617,6 +647,19 @@ SecureContainerStatus_t SecureContainer_Process(
             SECURE_CONTAINER_METADATA_MISMATCH,
             result_metadata);
     }
+
+#if defined(PHASE16_FAULT_PATCH_RESET)
+    /*
+     * Phase-16 HIL only: persist a one-shot witness commit, then reset before
+     * reconstructed Flash is erased. Recovery must re-enter PATCHING and
+     * deterministically replay the secure reconstruction.
+     */
+    status = Phase16InjectPatchReset(&working);
+    if (status != SECURE_CONTAINER_OK)
+    {
+        return status;
+    }
+#endif
 
     status = EraseReconstructed(info.header.target_image_size);
     if (status != SECURE_CONTAINER_OK)

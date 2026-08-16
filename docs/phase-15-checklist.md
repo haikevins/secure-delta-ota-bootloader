@@ -20,4 +20,4 @@
 - [x] CI release job is manual and isolated in `firmware-production`.
 - [x] Production signing secret is not exposed to normal CI jobs.
 - [x] Host/server/gateway contract test passes.
-- [ ] Physical Phase-15 ESP32 + STM32 HIL passes on user hardware.
+- [x] Physical Phase-15 ESP32 + STM32 HIL passes on target hardware.

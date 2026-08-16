@@ -3,6 +3,9 @@
 #include "ota_agent.h"
 #include "phase4_flash_selftest.h"
 #include "trial_confirmation.h"
+#if defined(PHASE16_HIL_SANITIZE_EXTERNAL)
+#include "external_flash_storage.h"
+#endif
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
@@ -62,7 +65,53 @@ int main(void)
         Application_FatalBlink();
     }
 
-#if defined(PHASE4_HW_TEST)
+#if defined(PHASE16_HIL_SANITIZE_EXTERNAL)
+    /*
+     * Phase-16 HIL baseline sanitizer.
+     *
+     * Each deterministic fault scenario must start with no stale download
+     * checkpoint or install handoff from a previous run.  The two records
+     * coexist in external Metadata A/B sectors. The Incoming partition is
+     * also erased because a newly signed SDOT can share most bytes with a
+     * previous artifact while differing in its ECDSA signature; NOR flash
+     * cannot program 0 -> 1 without an erase.
+     *
+     * Reconstructed, Backup and Log partitions remain untouched here because
+     * their owning bootloader paths erase/checkpoint them before use.
+     *
+     * This mode is never enabled in a production application build.
+     */
+    if (!ExternalFlashStorage_Init() ||
+        !ExternalFlashStorage_ErasePartition(
+            EXTERNAL_FLASH_PARTITION_METADATA_A) ||
+        !ExternalFlashStorage_ErasePartition(
+            EXTERNAL_FLASH_PARTITION_METADATA_B) ||
+        !ExternalFlashStorage_ErasePartition(
+            EXTERNAL_FLASH_PARTITION_INCOMING) ||
+        !ExternalFlashStorage_IsErased(
+            EXTERNAL_FLASH_PARTITION_METADATA_A,
+            0UL,
+            EXT_FLASH_SECTOR_SIZE) ||
+        !ExternalFlashStorage_IsErased(
+            EXTERNAL_FLASH_PARTITION_METADATA_B,
+            0UL,
+            EXT_FLASH_SECTOR_SIZE) ||
+        !ExternalFlashStorage_IsErased(
+            EXTERNAL_FLASH_PARTITION_INCOMING,
+            0UL,
+            EXT_INCOMING_SIZE))
+    {
+        Application_FatalBlink();
+    }
+
+    /* Solid LED is the local completion witness; runner waits before reflash. */
+    Application_LedSet(1U);
+    for (;;)
+    {
+        __WFI();
+    }
+
+#elif defined(PHASE4_HW_TEST)
     Phase4FlashSelfTest_Run();
     if (g_phase4_flash_test_status != PHASE4_FLASH_TEST_PASS)
     {
@@ -79,7 +128,7 @@ int main(void)
     for (;;)
     {
         const uint32_t phase = g_application_tick_ms % HEARTBEAT_PERIOD_MS;
-#if !defined(PHASE4_HW_TEST)
+#if !defined(PHASE4_HW_TEST) && !defined(PHASE16_HIL_SANITIZE_EXTERNAL)
         OtaAgent_Process();
         TrialConfirmation_Process(g_application_tick_ms);
 #endif

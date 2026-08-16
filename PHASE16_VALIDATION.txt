@@ -1,0 +1,85 @@
+Secure Delta OTA Phase 16 validation
+
+Required host/static command:
+  make phase16-check
+
+Expected host/static final marker:
+  Secure Delta OTA Phase 16 fault injection/HIL check: PASS
+
+Implemented deterministic matrix:
+  control-secure-delta
+  patch-reset
+  backup-reset
+  install-midpage-reset
+  mqtt-drop-after-accepted
+  https-truncate
+  tampered-signature
+  rollback-control
+  rollback-reset
+
+Static/build coverage:
+  Phase-16 fault matrix schema/invariants
+  STM32 PATCHING reset hook
+  STM32 backup checkpoint reset hook
+  STM32 internal-page torn-write reset hook
+  STM32 rollback checkpoint reset hook
+  MQTT reconnect/drop fixture
+  HTTPS truncated-body fixture
+  transport-valid signature-tamper fixture
+  gateway rejection/rollback fast-fail path
+  unprovisioned/credential-free packaging boundary
+  five bootloader fault-build variants <= 24 KiB
+
+Physical HIL command:
+  source ~/esp/esp-idf/export.sh
+  export STM32_OPENOCD=/usr/bin/openocd
+  export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
+  make phase16-hw-test \
+    ESP32_PORT=/dev/ttyUSB0 \
+    WIFI_SSID="..." \
+    WIFI_PASSWORD="..." \
+    PHASE16_HOST_IP=<PC_LAN_IP>
+
+Physical HIL expected final marker:
+  Phase 16 fault injection/HIL hardware test: PASS (9 deterministic scenarios)
+
+Status at packaging:
+  IMPLEMENTED + HOST/STATIC/FAULT-BUILD VERIFIED
+  PHYSICAL PHASE-16 HIL PENDING
+
+Direct Phase-16 checker result:
+  Phase 16 fault matrix: PASS scenarios=9 security+transport+reset+rollback
+  Phase 16 fault-injection source contracts: PASS
+  Phase 16 Python syntax: PASS
+  Phase 16 STM32 fault-build matrix: PASS toolchain=clang
+    control=11400 bytes
+    patch=11400 bytes
+    backup=11496 bytes
+    install=11588 bytes
+    rollback=11500 bytes
+  Phase 16 packaging security boundary: PASS
+  Secure Delta OTA Phase 16 fault injection/HIL check: PASS
+
+Packaging-environment note:
+  The direct Phase-16 checker completed to PASS. The aggregate
+  `make phase16-check` also reruns the complete Phase-14 and Phase-15 gates;
+  the packaging execution harness interrupted that aggregate command at its
+  per-call time limit before completion. Phase 14 and Phase 15 were already
+  independently hardware verified, and the Phase-16 checker itself was run
+  directly after the final source edits.
+  Phase-14 exact host secure-verifier compile regression: PASS
+  Phase-15 protected release workflow regression: PASS
+  Phase-15 direct server/release checker after fix: PASS
+  Phase-16 host-safe STM32 header guard: PASS
+  Phase-16 direct fault checker after fix: PASS
+  ESP-IDF log-format regression guard: PASS
+  Physical HIL re-test after ESP32 compile fix: PENDING
+  External W25Q metadata sanitizer source/build guard: PASS
+  Per-scenario external Metadata A/B clean baseline: IMPLEMENTED
+  Physical HIL re-test after external sanitizer fix: PENDING
+  Incoming partition erase/verify baseline guard: PASS
+  NOR 0->1 stale-artifact regression: COVERED
+  Physical HIL re-test after Incoming sanitize fix: PENDING
+  Negative final-status QoS1/PUBACK regression guard: PASS
+  tampered-signature broker terminal-state race: FIXED
+  Physical HIL re-test from scenario matrix: PENDING

@@ -39,12 +39,22 @@ Physical HIL:
     WIFI_PASSWORD="..." \
     PHASE15_HOST_IP=<PC_LAN_IP>
 
-Status at packaging:
-  IMPLEMENTED + HOST/SERVER/SECURITY VERIFIED.
-  Physical Phase-15 ESP32 + STM32 HIL pending user hardware.
-  MQTT URI source/binary/runtime diagnostic guard: PASS
-  Physical HIL network re-test: PENDING
-  Secure-install wait regression guard: PASS (STM32 final 120s; HIL MQTT idle 150s)
-  Physical HIL re-test after secure-wait fix: PENDING
-  Wi-Fi power-save reliability guard: PASS (WIFI_PS_NONE)
-  Physical HIL re-test after Wi-Fi reliability fix: PENDING
+Final physical HIL result:
+  P15_WIFI_PS=PASS mode=none
+  P11_MQTT=PASS
+  P11_COMMAND=PASS
+  P11_HTTPS=PASS
+  P11_UART_DATA=PASS 1446/1446
+  STM32 secure install reached TRIAL_BOOT and confirmed v2
+  P11_FINAL=PASS app=v2 state=IDLE
+  P11_PIPELINE=PASS
+  P11_GATEWAY_HW_TEST=PASS
+  STM32 metadata: IDLE, active_version=2, last_error=0
+  STM32 candidate byte-for-byte verification: PASS
+  P11_BROKER_RESULT=PASS
+  P15_HTTPS_RELEASE_GET=PASS
+  P15_RELEASE_PIPELINE=PASS
+  Phase 15 server/release pipeline hardware test: PASS
+
+Final Phase-15 status:
+  COMPLETE + HARDWARE VERIFIED

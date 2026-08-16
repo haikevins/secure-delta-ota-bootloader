@@ -637,17 +637,32 @@ static esp_err_t WaitForFinal(UartOtaClient_t *client,
         }
 
         /*
-         * If the old application is back in IDLE after we have seen trial,
-         * Phase 8 rolled back the candidate.
+         * After INSTALL has been ACKed, the old application can only return to
+         * IDLE when the secure candidate was rejected before TRIAL_BOOT or a
+         * trial candidate was rolled back. Do not burn the full 120 s timeout
+         * on deterministic negative fault-injection cases.
          */
-        if (saw_trial &&
-            (info.application_version != artifact->target_version) &&
+        if ((info.application_version != artifact->target_version) &&
             (info.update_state == UART_OTA_UPDATE_IDLE))
         {
             if (final_info != NULL)
             {
                 *final_info = info;
             }
+
+            if (saw_trial)
+            {
+                ESP_LOGW(TAG,
+                         "candidate rolled back to app v%" PRIu32,
+                         info.application_version);
+            }
+            else
+            {
+                ESP_LOGW(TAG,
+                         "candidate rejected before trial; app v%" PRIu32,
+                         info.application_version);
+            }
+
             return ESP_ERR_INVALID_STATE;
         }
 

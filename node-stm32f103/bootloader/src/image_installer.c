@@ -234,6 +234,34 @@ static void CopyResult(const BootMetadata_t *metadata,
     }
 }
 
+
+#define PHASE16_FAULT_BACKUP_MARKER  0xF0160002UL
+#define PHASE16_FAULT_INSTALL_MARKER 0xF0160003UL
+#define PHASE16_FAULT_ROLLBACK_TAG   0xF1000000UL
+#define PHASE16_FAULT_ROLLBACK_MASK  0x00FFFFFFUL
+
+#if defined(PHASE16_FAULT_BACKUP_RESET_OFFSET) || \
+    defined(PHASE16_FAULT_INSTALL_OFFSET) || \
+    defined(PHASE16_FAULT_ROLLBACK_RESET_OFFSET)
+static ImageInstallerStatus_t Phase16CommitMarkerAndReset(
+    BootMetadata_t *metadata,
+    uint32_t marker)
+{
+    metadata->last_error = marker;
+
+    if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
+    {
+        return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
+    }
+
+    NVIC_SystemReset();
+    for (;;)
+    {
+        __NOP();
+    }
+}
+#endif
+
 static ImageInstallerStatus_t RevertToActiveImage(
     BootMetadata_t *metadata,
     ImageInstallerStatus_t reason,
@@ -529,6 +557,26 @@ static ImageInstallerStatus_t InjectOneShotReset(BootMetadata_t *metadata)
 }
 #endif
 
+
+#if defined(PHASE16_FAULT_INSTALL_OFFSET)
+static uint8_t ShouldInjectPhase16InstallReset(
+    const BootMetadata_t *metadata,
+    uint32_t page_offset,
+    uint32_t page_length,
+    uint32_t bytes_programmed)
+{
+    const uint32_t inject_offset = (uint32_t)PHASE16_FAULT_INSTALL_OFFSET;
+    const uint32_t page_end = page_offset + page_length;
+
+    return (uint8_t)(
+        (metadata != (const BootMetadata_t *)0) &&
+        (metadata->last_error != PHASE16_FAULT_INSTALL_MARKER) &&
+        (inject_offset > page_offset) &&
+        (inject_offset < page_end) &&
+        ((page_offset + bytes_programmed) >= inject_offset));
+}
+#endif
+
 static ImageInstallerStatus_t ProgramBufferedApplicationPage(
     uint32_t page_offset,
     uint32_t page_length,
@@ -585,6 +633,23 @@ static ImageInstallerStatus_t ProgramBufferedApplicationPage(
         }
 #else
         (void)allow_phase7_fault;
+#endif
+
+#if defined(PHASE16_FAULT_INSTALL_OFFSET)
+        if ((allow_phase7_fault != 0U) &&
+            (ShouldInjectPhase16InstallReset(
+                metadata,
+                page_offset,
+                page_length,
+                i + 2UL) != 0U))
+        {
+            FLASH_Lock();
+            RestorePrimask(primask);
+            return Phase16CommitMarkerAndReset(
+                metadata,
+                PHASE16_FAULT_INSTALL_MARKER);
+        }
+#else
         (void)metadata;
 #endif
     }
@@ -757,6 +822,22 @@ static ImageInstallerStatus_t ResumeBackup(BootMetadata_t *metadata)
         {
             return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
         }
+
+#if defined(PHASE16_FAULT_BACKUP_RESET_OFFSET)
+        /*
+         * Phase-16 HIL: reset after a verified 4 KiB backup checkpoint.
+         * The exact-offset predicate makes the injection one-shot even though
+         * normal recovery clears last_error on the next committed chunk.
+         */
+        if ((metadata->copy_offset ==
+             (uint32_t)PHASE16_FAULT_BACKUP_RESET_OFFSET) &&
+            (metadata->last_error != PHASE16_FAULT_BACKUP_MARKER))
+        {
+            return Phase16CommitMarkerAndReset(
+                metadata,
+                PHASE16_FAULT_BACKUP_MARKER);
+        }
+#endif
     }
 
     internal_crc = CalculateInternalCrc(APPLICATION_MAX_SIZE);
@@ -925,6 +1006,18 @@ static uint32_t RollbackDiagnostic(const BootMetadata_t *metadata)
 {
     if (metadata->state == (uint32_t)UPDATE_ROLLBACK)
     {
+#if defined(PHASE16_FAULT_ROLLBACK_RESET_OFFSET)
+        /*
+         * A Phase16 fault witness keeps the original 24-bit rollback reason
+         * in the low bits so the final production diagnostic is restored.
+         */
+        if ((metadata->last_error & 0xFF000000UL) ==
+            PHASE16_FAULT_ROLLBACK_TAG)
+        {
+            return metadata->last_error &
+                   PHASE16_FAULT_ROLLBACK_MASK;
+        }
+#endif
         return metadata->last_error;
     }
 
@@ -988,6 +1081,27 @@ static ImageInstallerStatus_t ResumeRollbackCopy(BootMetadata_t *metadata)
         {
             return IMAGE_INSTALLER_METADATA_COMMIT_FAILED;
         }
+
+
+#if defined(PHASE16_FAULT_ROLLBACK_RESET_OFFSET)
+        /*
+         * Phase-16 HIL: reset after a verified rollback page checkpoint.
+         * Encode the original rollback reason into the witness marker so it
+         * survives the reset and is restored by RollbackDiagnostic().
+         */
+        if ((metadata->copy_offset ==
+             (uint32_t)PHASE16_FAULT_ROLLBACK_RESET_OFFSET) &&
+            ((metadata->last_error & 0xFF000000UL) !=
+             PHASE16_FAULT_ROLLBACK_TAG))
+        {
+            const uint32_t witness =
+                PHASE16_FAULT_ROLLBACK_TAG |
+                (metadata->last_error &
+                 PHASE16_FAULT_ROLLBACK_MASK);
+
+            return Phase16CommitMarkerAndReset(metadata, witness);
+        }
+#endif
     }
 
     return IMAGE_INSTALLER_OK;

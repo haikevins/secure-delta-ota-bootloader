@@ -1,2 +1,0 @@
-   text	   data	    bss	    dec	    hex	filename
-  11268	      8	   1960	  13236	   33b4	out-phase14-v2/application.elf

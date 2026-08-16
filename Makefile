@@ -11,11 +11,12 @@ TOOLCHAIN_ARG := $(if $(strip $(TOOLCHAIN)),TOOLCHAIN=$(TOOLCHAIN),)
         phase13-check phase13-base phase13-target phase13-delta phase13-baseline phase13-hw-test \
         phase14-check phase14-v1 phase14-v2 phase14-v3 phase14-hw-test \
         phase15-check phase15-hw-test phase15-gateway-build phase15-release \
+        phase16-check phase16-hw-test \
         bootloader application firmware combined \
         flash-bootloader flash-application flash-combined dump-metadata erase-metadata \
         gateway tools test release clean toolchain-info
 
-all: phase15-check
+all: phase16-check
 
 phase0-check:
 	@python3 scripts/phase0_check.py
@@ -327,6 +328,18 @@ phase15-release:
 		--output-root "$(if $(strip $(RELEASE_ROOT)),$(RELEASE_ROOT),dist/releases)"
 
 
+phase16-check: phase15-check
+	@$(TOOLCHAIN_ARG) python3 scripts/phase16_check.py
+
+phase16-hw-test:
+	@ESP32_PORT="$(ESP32_PORT)" PORT="$(PORT)" \
+		WIFI_SSID="$(WIFI_SSID)" WIFI_PASSWORD="$(WIFI_PASSWORD)" \
+		PHASE16_HOST_IP="$(PHASE16_HOST_IP)" PHASE15_HOST_IP="$(PHASE15_HOST_IP)" \
+		HTTPS_PORT="$(HTTPS_PORT)" MQTT_PORT="$(MQTT_PORT)" \
+		PHASE16_KEY_ID="$(PHASE16_KEY_ID)" \
+		$(TOOLCHAIN_ARG) python3 scripts/phase16_hw_test.py
+
+
 
 firmware: bootloader application
 
@@ -364,7 +377,7 @@ gateway: phase11-gateway-build
 tools:
 	@python3 -m compileall -q tools server scripts
 
-test: phase15-check
+test: phase16-check
 
 release:
 	@echo "Use make phase15-release TARGET=... TARGET_VERSION=... SIGNING_KEY=/secure/path/key.pem KEY_ID=0x... BASE_URL=https://firmware.example"
@@ -414,6 +427,10 @@ clean:
 	@rm -rf node-stm32f103/application/out-phase15-hw-v1
 	@rm -rf node-stm32f103/application/build-phase15-hw-v2
 	@rm -rf node-stm32f103/application/out-phase15-hw-v2
+	@rm -rf node-stm32f103/application/build-phase16-*
+	@rm -rf node-stm32f103/application/out-phase16-*
+	@rm -rf node-stm32f103/bootloader/build-phase16-*
+	@rm -rf node-stm32f103/bootloader/out-phase16-*
 	@rm -rf node-stm32f103/bootloader/build-phase7-fault
 	@rm -rf node-stm32f103/bootloader/out-phase7-fault
 	@rm -rf gateway-esp32/build gateway-esp32/sdkconfig dist build-host

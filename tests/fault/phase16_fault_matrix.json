@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "phase": 16,
+  "title": "Fault injection and HIL",
+  "scenarios": [
+    {
+      "id": "control-secure-delta",
+      "fault": "none",
+      "expected_gateway": "pass",
+      "expected_active_version": 2,
+      "expected_last_error": "0x00000000",
+      "generation_delta_from_control": 0,
+      "invariant": "signed delta installs and confirms"
+    },
+    {
+      "id": "patch-reset",
+      "fault": "stm32 reset immediately after persistent PATCHING transition",
+      "bootloader_cflag": "-DPHASE16_FAULT_PATCH_RESET=1",
+      "expected_gateway": "pass",
+      "expected_active_version": 2,
+      "expected_last_error": "0x00000000",
+      "generation_delta_from_control": 1,
+      "invariant": "reconstruction replay is deterministic; active app remains recoverable"
+    },
+    {
+      "id": "backup-reset",
+      "fault": "stm32 reset after verified 4KiB backup checkpoint",
+      "bootloader_cflag": "-DPHASE16_FAULT_BACKUP_RESET_OFFSET=4096UL",
+      "expected_gateway": "pass",
+      "expected_active_version": 2,
+      "expected_last_error": "0x00000000",
+      "generation_delta_from_control": 1,
+      "invariant": "backup resumes from committed sector boundary before internal app erase"
+    },
+    {
+      "id": "install-midpage-reset",
+      "fault": "stm32 reset at byte 1536 while programming second internal flash page",
+      "bootloader_cflag": "-DPHASE16_FAULT_INSTALL_OFFSET=1536UL",
+      "expected_gateway": "pass",
+      "expected_active_version": 2,
+      "expected_last_error": "0x00000000",
+      "generation_delta_from_control": 1,
+      "invariant": "torn internal page is erased/replayed from prior 1KiB checkpoint"
+    },
+    {
+      "id": "mqtt-drop-after-accepted",
+      "fault": "broker drops TLS connection after accepted status",
+      "mqtt_disconnect_on_state": "accepted",
+      "expected_gateway": "pass",
+      "expected_active_version": 2,
+      "expected_last_error": "0x00000000",
+      "generation_delta_from_control": 0,
+      "invariant": "MQTT status channel reconnect does not interrupt HTTPS/UART install"
+    },
+    {
+      "id": "https-truncate",
+      "fault": "HTTPS closes after first 512 bytes while advertising full Content-Length",
+      "https_mode": "truncate",
+      "expected_gateway": "fail",
+      "expected_active_version": 1,
+      "expected_last_error": "0x00000000",
+      "invariant": "incomplete transport never reaches STM32 INSTALL and active app is unchanged"
+    },
+    {
+      "id": "tampered-signature",
+      "fault": "one signature byte is flipped; transport CRC is recomputed to match tampered bytes",
+      "https_mode": "normal-test-server",
+      "tamper": "signature-last-byte",
+      "expected_gateway": "fail",
+      "expected_active_version": 1,
+      "expected_last_error": "nonzero",
+      "invariant": "STM32 signature trust boundary rejects transport-valid tampered SDOT"
+    },
+    {
+      "id": "rollback-control",
+      "fault": "signed candidate deliberately never confirms",
+      "candidate_cflag": "-DPHASE8_DISABLE_TRIAL_CONFIRM=1",
+      "expected_gateway": "fail",
+      "expected_active_version": 1,
+      "expected_last_error": "0x0008B003",
+      "generation_delta_from_rollback_control": 0,
+      "invariant": "three failed trial boots trigger rollback to exact baseline"
+    },
+    {
+      "id": "rollback-reset",
+      "fault": "signed candidate never confirms; stm32 resets after first rollback page checkpoint",
+      "bootloader_cflag": "-DPHASE16_FAULT_ROLLBACK_RESET_OFFSET=1024UL",
+      "candidate_cflag": "-DPHASE8_DISABLE_TRIAL_CONFIRM=1",
+      "expected_gateway": "fail",
+      "expected_active_version": 1,
+      "expected_last_error": "0x0008B003",
+      "invariant": "rollback survives reset and restores the exact pre-update 38KiB application region",
+      "generation_delta_from_rollback_control": 1
+    }
+  ]
+}
