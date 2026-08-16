@@ -11,10 +11,10 @@
 #include "janpatch_port.h"
 #include "memory_map.h"
 #include "metadata_storage.h"
-#include "phase14_trusted_key.h"
+#include "trusted_key.h"
 #include "sha256.h"
 
-#if defined(PHASE16_FAULT_PATCH_RESET)
+#if defined(HIL_FAULT_PATCH_RESET)
 #include "stm32f10x.h"
 #endif
 
@@ -53,18 +53,18 @@ static MetadataStorageStatus_t CommitMetadata(BootMetadata_t *metadata)
 }
 
 
-#define PHASE16_FAULT_PATCH_MARKER 0xF0160001UL
+#define HIL_FAULT_PATCH_MARKER 0xF0160001UL
 
-#if defined(PHASE16_FAULT_PATCH_RESET)
-static SecureContainerStatus_t Phase16InjectPatchReset(
+#if defined(HIL_FAULT_PATCH_RESET)
+static SecureContainerStatus_t InjectPatchReset(
     BootMetadata_t *metadata)
 {
-    if (metadata->last_error == PHASE16_FAULT_PATCH_MARKER)
+    if (metadata->last_error == HIL_FAULT_PATCH_MARKER)
     {
         return SECURE_CONTAINER_OK;
     }
 
-    metadata->last_error = PHASE16_FAULT_PATCH_MARKER;
+    metadata->last_error = HIL_FAULT_PATCH_MARKER;
     if (CommitMetadata(metadata) != METADATA_STORAGE_OK)
     {
         return SECURE_CONTAINER_METADATA_COMMIT_FAILED;
@@ -249,7 +249,7 @@ SecureContainerStatus_t SecureContainer_LoadVerifiedInfo(
         return SECURE_CONTAINER_FLASH_INIT_FAILED;
     }
 
-#if PHASE14_TRUSTED_KEY_PROVISIONED == 0
+#if TRUSTED_KEY_PROVISIONED == 0
     return SECURE_CONTAINER_UNPROVISIONED_KEY;
 #endif
 
@@ -259,7 +259,7 @@ SecureContainerStatus_t SecureContainer_LoadVerifiedInfo(
         return status;
     }
 
-    if (info->extension.key_id != PHASE14_TRUSTED_KEY_ID)
+    if (info->extension.key_id != TRUSTED_KEY_ID)
     {
         return SECURE_CONTAINER_KEY_ID_MISMATCH;
     }
@@ -290,7 +290,7 @@ SecureContainerStatus_t SecureContainer_LoadVerifiedInfo(
     }
 
     if (EcdsaP256_VerifyDigest(
-            g_phase14_trusted_public_key,
+            g_trusted_public_key,
             signed_digest,
             signature) != ECDSA_P256_VALID)
     {
@@ -648,13 +648,13 @@ SecureContainerStatus_t SecureContainer_Process(
             result_metadata);
     }
 
-#if defined(PHASE16_FAULT_PATCH_RESET)
+#if defined(HIL_FAULT_PATCH_RESET)
     /*
-     * Phase-16 HIL only: persist a one-shot witness commit, then reset before
+     * deterministic HIL only: persist a one-shot witness commit, then reset before
      * reconstructed Flash is erased. Recovery must re-enter PATCHING and
      * deterministically replay the secure reconstruction.
      */
-    status = Phase16InjectPatchReset(&working);
+    status = InjectPatchReset(&working);
     if (status != SECURE_CONTAINER_OK)
     {
         return status;

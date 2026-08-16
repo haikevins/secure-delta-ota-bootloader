@@ -44,11 +44,11 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "dist/secure-delta-ota-phase14-unprovisioned.bin",
+        default=root / "dist/secure-delta-ota-combined.bin",
     )
     parser.add_argument(
         "--label",
-        default="Phase 14 (unprovisioned trust anchor)",
+        default="secure OTA image (unprovisioned trust anchor)",
         help="manifest label only; does not change image layout",
     )
     args = parser.parse_args()

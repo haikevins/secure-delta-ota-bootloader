@@ -1,109 +1,31 @@
 # Secure Delta OTA Bootloader
 
-Reference project for **STM32F103C8T6 + ESP32 + external SPI NOR Flash**.
+Portfolio-grade secure OTA update system for an STM32F103C8T6 node with an ESP32 network gateway and external W25Q SPI NOR flash.
 
-STM32 uses **Standard Peripheral Library + CMSIS**, not HAL. ESP32 uses
-**ESP-IDF**.
+The repository includes the bootloader, application-side OTA receiver, ESP32 gateway, signed release tooling, deterministic fault-injection HIL runner, reproducible benchmark tooling, CI contracts, and portfolio documentation.
 
-## Status
+## What the system demonstrates
 
-- Phase 0 — Specification: complete.
-- Phase 1 — Build foundation: complete.
-- Phase 2 — Application handoff: complete + hardware verified.
-- Phase 3 — Metadata/boot decision: complete + hardware verified.
-- Phase 4 — External SPI Flash: complete + hardware verified.
-- Phase 5 — UART protocol with PC Python: complete + hardware verified.
-- Phase 6 — Basic Full OTA: complete + hardware verified.
-- Phase 7 — Power-loss recovery: complete + hardware fault-injection verified.
-- Phase 8 — Trial boot and rollback: complete + hardware verified.
-- Phase 9 — ESP32 UART Gateway: complete + hardware verified.
-- Phase 10 — HTTPS download: complete + hardware verified.
-- Phase 11 — MQTT orchestration: complete + hardware verified.
-- Phase 12 — Delta patch generation: complete + host verified.
-- Phase 13 — STM32 delta patching: complete + hardware verified.
-- Phase 14 — Secure container/signature: complete + hardware verified.
-- Phase 15 — Server and release pipeline: complete + hardware verified.
-- Phase 16 — Fault injection and HIL: complete + hardware verified.
-- Phase 17 — Benchmark and portfolio: complete.
+- **Secure boot/update boundary:** SHA-256 + ECDSA P-256 signed SDOT containers.
+- **Delta OTA:** JojoDiff-compatible host generation and streaming reconstruction on STM32.
+- **Resumable transport:** COBS-framed UART protocol with sequence, offset, ACK/NACK, retry and resume.
+- **External staging:** W25Q32/W25Q64 support with a fixed logical 4 MiB OTA layout.
+- **Power-loss recovery:** persistent checkpoints for receive, patch, backup, install and rollback paths.
+- **Trial boot and rollback:** candidate firmware must confirm health; otherwise the validated backup is restored.
+- **Network gateway:** ESP32 uses MQTTS for orchestration/status and HTTPS for firmware bytes.
+- **Release pipeline:** immutable signed releases, exact previous-binary deltas, full-image fallback and signed manifests.
+- **Deterministic HIL:** nine hardware fault scenarios covering reset, transport failure, signature tamper and rollback recovery.
+- **Reproducible benchmark:** flash/RAM footprint, raw/signed delta efficiency and build-time observations.
 
-## Final verification
+## Hardware
 
-```bash
-make phase17-check
-make phase17-benchmark
-```
+- STM32F103C8T6 Blue Pill
+- ESP32 gateway
+- W25Q64 external SPI NOR on STM32
+- ST-Link/V2 for SWD programming/debug
+- UART between ESP32 and STM32
 
-Reference portfolio metrics:
-
-- Phase-16 physical fault matrix: **9/9 PASS**.
-- Bootloader flash: **11400 B / 24 KiB (46.39%)**.
-- Application v2 flash: **11276 B / 38 KiB (28.98%)**.
-- Raw JojoDiff savings: **91.40%**.
-- Signed SDOT delta savings: **89.77%**.
-- Final rollback-reset restores confirmed v1 and preserves diagnostic `0x0008B003`.
-
-Start the portfolio walkthrough at `docs/portfolio-one-page.md`.
-
-## Phase 11 pipeline
-
-```text
-MQTTS broker
-   |
-   | update metadata / status / progress
-   v
-ESP32
-   |
-   | HTTPS firmware
-   v
-stm32_cache
-   |
-   | UART OTA
-   v
-STM32
-   |
-backup -> install -> trial -> confirm
-```
-
-MQTT does not carry firmware bytes. The MQTT command names the HTTPS artifact
-and supplies expected size/CRC32. ESP32 verifies those fields after download
-before passing the artifact to STM32.
-
-## Host/build validation
-
-```bash
-make phase11-check
-```
-
-## ESP32 build
-
-ESP-IDF 6.x downloads the managed MQTT and cJSON components declared in
-`gateway-esp32/main/idf_component.yml`.
-
-```bash
-source ~/esp/esp-idf/export.sh
-make phase11-gateway-build
-```
-
-## Phase 11 hardware test
-
-```bash
-source ~/esp/esp-idf/export.sh
-
-export STM32_OPENOCD=/usr/bin/openocd
-export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
-
-make phase11-hw-test \
-  ESP32_PORT=/dev/ttyUSB0 \
-  WIFI_SSID="your-ssid" \
-  WIFI_PASSWORD="your-password" \
-  PHASE11_HOST_IP=192.168.1.8
-```
-
-The PC starts both a local TLS MQTT broker (`8883`) and TLS HTTPS firmware
-server (`8443`). If a host firewall is active, permit those ports from the
-local LAN.
-
-Default UART wiring:
+UART wiring:
 
 ```text
 ESP32 GPIO17 TX -> STM32 PA10 RX
@@ -111,262 +33,240 @@ ESP32 GPIO16 RX <- STM32 PA9 TX
 ESP32 GND       -> STM32 GND
 ```
 
-See:
-
-- `docs/phase-11-mqtt-orchestration.md`
-- `docs/phase-11-checklist.md`
-- `PHASE11_REPORT.md`
-
-
-## Phase 12 delta generation
-
-Phase 12 generates a JojoDiff-compatible delta from an exact application v1
-binary to application v2, reconstructs v2 on the host and validates the result
-byte-for-byte.
-
-```bash
-make phase12-check
-```
-
-Individual targets:
-
-```bash
-make phase12-base
-make phase12-target
-make phase12-delta
-```
-
-Artifacts:
+External flash wiring:
 
 ```text
-dist/phase12/application-v1-to-v2.jdiff
-dist/phase12/application-v1-to-v2.json
-dist/phase12/application-v1-to-v2-reconstructed.bin
+STM32 PA5  -> W25Q SCK
+STM32 PA6  <- W25Q MISO
+STM32 PA7  -> W25Q MOSI
+STM32 PB0  -> W25Q CS
 ```
 
-Phase 12 is host-only. STM32 streaming delta application begins in Phase 13.
+## Memory layout
 
-See:
-
-- `docs/phase-12-delta-generation.md`
-- `docs/phase-12-checklist.md`
-- `PHASE12_REPORT.md`
-
-
-## Phase 13 STM32 delta patch
-
-Phase 13 applies the Phase-12 JojoDiff-compatible patch on the STM32
-bootloader without overwriting the active application during reconstruction.
+Internal flash:
 
 ```text
-internal app v1 + W25Q Incoming D13P/.jdiff
-        -> W25Q Reconstructed v2
-        -> verify
-        -> backup/install/trial/confirm
+0x08000000 - 0x08005FFF   Bootloader        24 KiB
+0x08006000 - 0x0800F7FF   Application       38 KiB
+0x0800F800 - 0x0800FBFF   Metadata A         1 KiB
+0x0800FC00 - 0x0800FFFF   Metadata B         1 KiB
 ```
 
-Host/build validation:
+External logical OTA layout:
 
-```bash
-make phase13-check
+```text
+0x000000 - 0x001FFF   Metadata A/B
+0x002000 - 0x021FFF   Incoming artifact      128 KiB
+0x022000 - 0x041FFF   Reconstructed image    128 KiB
+0x042000 - 0x061FFF   Validated backup       128 KiB
+0x062000 - 0x071FFF   Logs                    64 KiB
+remaining space       Reserved
 ```
 
-Direct STM32 hardware test:
+## End-to-end update flow
+
+```text
+CI / release tooling
+        |
+        | signed manifest + SDOT artifact
+        v
+HTTPS release server <---- MQTTS command/status ----> ESP32 gateway
+                                                    |
+                                                    | COBS UART
+                                                    v
+                                               STM32 application
+                                                    |
+                                                    | stages artifact
+                                                    v
+                                               external SPI NOR
+                                                    |
+                                                    | reset / install
+                                                    v
+                                               STM32 bootloader
+                                                    |
+                          verify signature/base -> patch/full image
+                                                    |
+                               backup -> install -> verify -> trial
+                                                    |
+                                    confirm or automatic rollback
+```
+
+Firmware bytes remain on HTTPS. MQTT is used only for orchestration, progress and terminal status.
+
+## Security model
+
+The SDOT container binds:
+
+- image type;
+- product and hardware revision;
+- base and target versions;
+- payload size;
+- SHA-256 of payload/base/target;
+- signing key ID;
+- ECDSA P-256 signature over the signed header plus payload.
+
+Unsigned legacy artifacts are disabled in the secure build. Anti-downgrade checks reject target versions that are not newer than the active version.
+
+The repository intentionally ships with an **unprovisioned trust anchor**:
+
+```c
+#define TRUSTED_KEY_PROVISIONED 0U
+#define TRUSTED_KEY_ID          0UL
+```
+
+Use `tools/keytool.py` during a controlled build to generate a provisioned public-key header. Private signing keys are never embedded in STM32 firmware and are not included in this repository.
+
+## Build and verification
+
+Select a supported STM32 toolchain:
 
 ```bash
+make toolchain-info
+```
+
+Run the complete host/build/security/portfolio gate:
+
+```bash
+make check TOOLCHAIN=gcc
+```
+
+or, where only Clang + llvm-objcopy are available:
+
+```bash
+make check TOOLCHAIN=clang
+```
+
+Build firmware:
+
+```bash
+make firmware TOOLCHAIN=gcc
+make combined TOOLCHAIN=gcc
+```
+
+Build the ESP32 gateway:
+
+```bash
+source ~/esp/esp-idf/export.sh
+make gateway
+```
+
+## Benchmark
+
+Run:
+
+```bash
+make benchmark TOOLCHAIN=gcc
+```
+
+Outputs are written to:
+
+```text
+dist/benchmark/benchmark.json
+dist/benchmark/benchmark.csv
+dist/benchmark/benchmark.md
+```
+
+The last verified GCC hardware-project benchmark recorded:
+
+```text
+Bootloader flash        9412 B
+Application v2 flash    9648 B
+Raw delta               1242 B
+Signed delta             1446 B
+Signed full              9852 B
+Raw delta savings        87.13%
+Signed delta savings     85.32%
+HIL evidence             9/9 PASS
+```
+
+Exact footprint and timing values can vary by compiler/toolchain version. Partition limits and delta-efficiency policies are checked automatically.
+
+## Deterministic hardware-in-the-loop test
+
+The HIL runner executes nine scenarios:
+
+1. secure delta control update;
+2. reset during patch reconstruction;
+3. reset during backup;
+4. reset during internal-flash install;
+5. MQTT disconnect after command acceptance;
+6. truncated HTTPS transfer;
+7. tampered ECDSA signature;
+8. automatic rollback control;
+9. reset during rollback.
+
+Run on connected hardware:
+
+```bash
+source ~/esp/esp-idf/export.sh
+
 export STM32_OPENOCD=/usr/bin/openocd
 export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
 
-make phase13-hw-test PORT=/dev/ttyUSB0
+make hil-test \
+  ESP32_PORT=/dev/ttyUSB0 \
+  WIFI_SSID="your-ssid" \
+  WIFI_PASSWORD="your-password" \
+  SDOTA_HOST_IP=<PC_LAN_IP>
 ```
 
-For the direct PC-UART hardware test, disconnect the ESP32 UART wires from
-STM32 PA9/PA10.
+The verified hardware result is documented in `docs/hil-results.md`.
 
-See:
+## Release generation
 
-- `docs/phase-13-stm32-delta.md`
-- `docs/phase-13-checklist.md`
-- `PHASE13_REPORT.md`
-
-
-## Phase 14 secure container
-
-Phase 14 requires signed `SDOT` containers by default:
-
-```text
-SHA-256
-ECDSA P-256
-140-byte signed header (SDOT + SCX1)
-64-byte raw r||s signature
-```
-
-The STM32 bootloader contains only a trusted public key. Private signing keys
-stay outside the repository.
-
-Host/build/security validation:
+Example:
 
 ```bash
-make phase14-check
-```
-
-Physical STM32 validation:
-
-```bash
-export STM32_OPENOCD=/usr/bin/openocd
-export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
-make phase14-hw-test PORT=/dev/ttyUSB0
-```
-
-See:
-
-- `docs/phase-14-secure-container.md`
-- `docs/phase-14-checklist.md`
-- `PHASE14_REPORT.md`
-
-
-## Phase 15 server and release pipeline
-
-Phase 15 creates immutable signed releases, verifies them before publication,
-pins the authorized release-key fingerprint on server/publisher operations,
-serves artifacts over HTTPS, publishes Phase-11-compatible commands over MQTTS
-QoS1, and upgrades the ESP32 gateway to extract Phase-14 SDOT metadata for the
-UART START packet.
-
-Host/server validation:
-
-```bash
-make phase15-check
-```
-
-Create a local release:
-
-```bash
-make phase15-release \
-  TARGET=/path/to/application-v3.bin \
-  TARGET_VERSION=3 \
-  BASE=/path/to/application-v2.bin \
-  BASE_VERSION=2 \
-  SIGNING_KEY=/secure/location/firmware-signing.pem \
-  KEY_ID=0x14000001 \
+make release \
+  TARGET=path/to/application-v2.bin \
+  TARGET_VERSION=2 \
+  BASE=path/to/application-v1.bin \
+  BASE_VERSION=1 \
+  SIGNING_KEY=/secure/path/release-key.pem \
+  KEY_ID=0x15000001 \
   BASE_URL=https://firmware.example
 ```
 
-Physical end-to-end HIL:
+The release tool chooses a delta only when it satisfies the configured savings policy and always emits a signed full-image fallback.
 
-```bash
-source ~/esp/esp-idf/export.sh
-export STM32_OPENOCD=/usr/bin/openocd
-export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
-
-make phase15-hw-test \
-  ESP32_PORT=/dev/ttyUSB0 \
-  WIFI_SSID="your-ssid" \
-  WIFI_PASSWORD="your-password" \
-  PHASE15_HOST_IP=<PC_LAN_IP>
-```
-
-Wiring is the normal ESP32 gateway wiring:
+## Repository map
 
 ```text
-ESP32 GPIO17 TX -> STM32 PA10 RX
-ESP32 GPIO16 RX <- STM32 PA9 TX
-ESP32 GND       -> STM32 GND
-ST-Link         -> STM32 SWD
+node-stm32f103/bootloader/   Secure bootloader, patch/install/rollback logic
+node-stm32f103/application/  Application OTA receiver and confirmation logic
+node-stm32f103/common/       Shared STM32 flash/storage drivers
+gateway-esp32/               ESP32 MQTTS + HTTPS + UART gateway
+shared/                      Cross-component container/metadata primitives
+server/                      Release server, manifest and MQTT publisher
+tools/                       Signing, delta, release and inspection tools
+scripts/                     Build/check/benchmark/HIL automation
+tests/                       Host/unit/fault test assets
+benchmarks/                  Checked-in reference benchmark
+docs/                        Architecture, protocol, HIL and portfolio docs
 ```
 
-See:
+## Portfolio evidence
 
-- `docs/phase-15-server-release-pipeline.md`
-- `docs/phase-15-checklist.md`
-- `PHASE15_REPORT.md`
-
-## Phase 16 fault injection and HIL
-
-Phase 16 stress-tests the complete Phase-15 secure release path with
-deterministic reset, transport, authentication and rollback faults.
-
-The machine-readable matrix contains nine scenarios:
-
-```text
-control-secure-delta
-patch-reset
-backup-reset
-install-midpage-reset
-mqtt-drop-after-accepted
-https-truncate
-tampered-signature
-rollback-control
-rollback-reset
-```
-
-Host/static validation:
-
-```bash
-make phase16-check
-```
-
-Physical fault matrix:
-
-```bash
-source ~/esp/esp-idf/export.sh
-export STM32_OPENOCD=/usr/bin/openocd
-export STM32_OPENOCD_SCRIPTS=/usr/share/openocd/scripts
-
-make phase16-hw-test \
-  ESP32_PORT=/dev/ttyUSB0 \
-  WIFI_SSID="your-ssid" \
-  WIFI_PASSWORD="your-password" \
-  PHASE16_HOST_IP=<PC_LAN_IP>
-```
-
-The HIL runner starts every scenario from a fresh v1 baseline, uses signed SDOT
-releases, and verifies STM32 metadata plus application bytes after each fault.
-Reset scenarios use persistent checkpoint witnesses so the test can prove that
-the requested fault actually executed.
-
-See:
-
-- `docs/phase-16-fault-injection-hil.md`
-- `docs/phase-16-checklist.md`
-- `PHASE16_REPORT.md`
-
-## Phase 17 benchmark and portfolio
-
-Phase 17 closes the project with reproducible benchmark artifacts and a concise
-portfolio/demo package.
-
-Run the final closure gate:
-
-```bash
-make phase17-check
-```
-
-Generate benchmark outputs:
-
-```bash
-make phase17-benchmark
-```
-
-Generated files:
-
-```text
-dist/phase17/phase17_benchmark.json
-dist/phase17/phase17_benchmark.csv
-dist/phase17/phase17_benchmark.md
-```
-
-The checked-in reference snapshot is under `benchmarks/`. Current reference:
-**89.77% signed-delta savings**,
-bootloader **46.39% of 24 KiB**, and
-application v2 **28.98% of 38 KiB**.
-Benchmark PASS/FAIL
-uses portable constraints (flash/RAM budgets, artifact savings, partition
-fit, 9/9 HIL evidence); host wall-clock timings are informational only.
-
-Portfolio entry points:
+Start with:
 
 - `docs/portfolio-one-page.md`
 - `docs/portfolio-demo.md`
 - `docs/portfolio-evidence.md`
-- `PHASE17_REPORT.md`
+- `docs/hil-results.md`
+- `benchmarks/reference.md`
+- `PROJECT_REPORT.md`
+- `VALIDATION.md`
+
+## Verified status
+
+The integrated project has passed:
+
+- secure release and signed-container host validation;
+- STM32 flash/RAM budget checks;
+- deterministic delta round-trip checks;
+- packaging checks for unprovisioned trust anchor and absent private credentials;
+- full deterministic HIL fault matrix: **9/9 PASS**;
+- final rollback-reset state restoring confirmed application v1.
+
+The project is therefore presented as a completed secure delta OTA reference implementation and portfolio artifact.

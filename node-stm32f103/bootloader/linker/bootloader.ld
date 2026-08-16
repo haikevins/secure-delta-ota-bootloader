@@ -1,5 +1,5 @@
 /* STM32F103C8T6 secure bootloader linker script.
- * Phase 1 reserves 24 KiB at the bottom of internal Flash.
+ * platform bring-up reserves 24 KiB at the bottom of internal Flash.
  */
 ENTRY(Reset_Handler)
 

@@ -1,9 +1,9 @@
 #include <stdint.h>
 #include "memory_map.h"
 #include "ota_agent.h"
-#include "phase4_flash_selftest.h"
+#include "flash_selftest.h"
 #include "trial_confirmation.h"
-#if defined(PHASE16_HIL_SANITIZE_EXTERNAL)
+#if defined(HIL_SANITIZE_EXTERNAL)
 #include "external_flash_storage.h"
 #endif
 #include "stm32f10x.h"
@@ -65,9 +65,9 @@ int main(void)
         Application_FatalBlink();
     }
 
-#if defined(PHASE16_HIL_SANITIZE_EXTERNAL)
+#if defined(HIL_SANITIZE_EXTERNAL)
     /*
-     * Phase-16 HIL baseline sanitizer.
+     * deterministic HIL baseline sanitizer.
      *
      * Each deterministic fault scenario must start with no stale download
      * checkpoint or install handoff from a previous run.  The two records
@@ -111,9 +111,9 @@ int main(void)
         __WFI();
     }
 
-#elif defined(PHASE4_HW_TEST)
-    Phase4FlashSelfTest_Run();
-    if (g_phase4_flash_test_status != PHASE4_FLASH_TEST_PASS)
+#elif defined(FLASH_SELFTEST_HW_MODE)
+    FlashSelfTest_Run();
+    if (g_flash_selftest_status != FLASH_SELFTEST_PASS)
     {
         Application_FatalBlink();
     }
@@ -127,12 +127,12 @@ int main(void)
 
     for (;;)
     {
-        const uint32_t phase = g_application_tick_ms % HEARTBEAT_PERIOD_MS;
-#if !defined(PHASE4_HW_TEST) && !defined(PHASE16_HIL_SANITIZE_EXTERNAL)
+        const uint32_t cycle_position = g_application_tick_ms % HEARTBEAT_PERIOD_MS;
+#if !defined(FLASH_SELFTEST_HW_MODE) && !defined(HIL_SANITIZE_EXTERNAL)
         OtaAgent_Process();
         TrialConfirmation_Process(g_application_tick_ms);
 #endif
-        Application_LedSet((uint8_t)(phase < HEARTBEAT_ON_TIME_MS));
+        Application_LedSet((uint8_t)(cycle_position < HEARTBEAT_ON_TIME_MS));
         __WFI();
     }
 }

@@ -1,10 +1,10 @@
-# Phase 4 — External SPI Flash
+# external-flash integration — External SPI Flash
 
 Status: **implemented; hardware validation script provided**
 
 ## Target and wiring
 
-The production layout targets W25Q32 (4 MiB, JEDEC `EF 40 16`). Phase 4 also accepts W25Q64 (8 MiB, JEDEC `EF 40 17`) as compatible development hardware; the OTA layout still uses only the first 4 MiB.
+The production layout targets W25Q32 (4 MiB, JEDEC `EF 40 16`). external-flash integration also accepts W25Q64 (8 MiB, JEDEC `EF 40 17`) as compatible development hardware; the OTA layout still uses only the first 4 MiB.
 
 | Signal | STM32F103 | W25Q32/W25Q64 |
 |---|---|---|
@@ -53,23 +53,23 @@ a relative offset, preventing later OTA code from using arbitrary addresses.
 0x062000  Update Logs             64 KiB
 0x072000  Reserved
 ...
-0x3FF000  Phase 4 Self-test        4 KiB
+0x3FF000  external-flash integration Self-test        4 KiB
 0x400000  End
 ```
 
-The final sector is exclusively reserved for destructive Phase 4 hardware
+The final sector is exclusively reserved for destructive external-flash integration hardware
 validation.
 
 ## Repository validation
 
 ```bash
-make phase4-check
+make external-flash integration-check
 ```
 
 ## Hardware validation
 
 ```bash
-make phase4-hw-test
+make external-flash integration-hw-test
 ```
 
 The dedicated image checks JEDEC ID, erases the final sector, blank-checks it,
@@ -80,10 +80,10 @@ blank-checks the sector again.
 Expected final output:
 
 ```text
-P4_STATUS=0x50415353
-P4_JEDEC=0x00EF4016  # or 0x00EF4017
-P4_DRIVER_STATUS=0x00000000
-Phase 4 hardware SPI Flash test: PASS
+FLASH_SELFTEST_STATUS=0x50415353
+FLASH_SELFTEST_JEDEC=0x00EF4016  # or 0x00EF4017
+FLASH_SELFTEST_DRIVER_STATUS=0x00000000
+external-flash integration hardware SPI Flash test: PASS
 ```
 
 Restore the normal firmware afterwards with `make flash-combined`.

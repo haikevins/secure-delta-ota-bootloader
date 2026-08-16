@@ -1,0 +1,236 @@
+{
+  "$id": "https://example.invalid/secure-delta-ota/release pipeline-release-manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "base_version": {
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "crc32": {
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "filename": {
+            "pattern": "^[^/\\\\]+$",
+            "type": "string"
+          },
+          "key_id": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "full",
+              "delta"
+            ]
+          },
+          "payload_size": {
+            "maximum": 131072,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "size": {
+            "maximum": 131072,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "target_size": {
+            "maximum": 38912,
+            "minimum": 8,
+            "type": "integer"
+          },
+          "target_version": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "url": {
+            "pattern": "^https://",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "filename",
+          "url",
+          "base_version",
+          "target_version",
+          "size",
+          "crc32",
+          "sha256",
+          "payload_size",
+          "target_size",
+          "key_id"
+        ],
+        "type": "object"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array"
+    },
+    "channel": {
+      "enum": [
+        "stable",
+        "beta",
+        "dev"
+      ]
+    },
+    "created_utc": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "delta_policy": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_savings_percent": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "base_version": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "included": {
+          "type": "boolean"
+        },
+        "minimum_savings_percent": {
+          "exclusiveMaximum": 100,
+          "minimum": 0,
+          "type": "number"
+        },
+        "patch_stats": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "requested": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requested",
+        "base_version",
+        "minimum_savings_percent",
+        "actual_savings_percent",
+        "included",
+        "patch_stats"
+      ],
+      "type": "object"
+    },
+    "hardware_revision": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "product_id": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "release_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+    },
+    "release_notes": {
+      "const": "release-notes.md"
+    },
+    "schema": {
+      "const": 1
+    },
+    "signing_key": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ECDSA-P256-SHA256"
+        },
+        "key_id": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "public_key_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "algorithm",
+        "public_key_sha256"
+      ],
+      "type": "object"
+    },
+    "source_revision": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "target": {
+      "additionalProperties": false,
+      "properties": {
+        "crc32": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "filename": {
+          "pattern": "^[^/\\\\]+$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "size": {
+          "maximum": 38912,
+          "minimum": 8,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "filename",
+        "size",
+        "crc32",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "target_version": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema",
+    "release_id",
+    "channel",
+    "created_utc",
+    "source_revision",
+    "product_id",
+    "hardware_revision",
+    "target_version",
+    "signing_key",
+    "target",
+    "artifacts",
+    "delta_policy",
+    "release_notes"
+  ],
+  "title": "Secure Delta OTA release pipeline Release Manifest",
+  "type": "object"
+}

@@ -1,6 +1,6 @@
 # Firmware Release Process
 
-Status: Phase 15 implemented.
+Status: release pipeline implemented.
 
 ```text
 Build target application.bin
@@ -51,7 +51,7 @@ dist/releases/fw-vN/
 
 - Never commit signing private keys.
 - Never copy private signing keys to ESP32 or STM32.
-- `tools/phase15_release.py` refuses a key inside the repository.
+- `tools/release.py` refuses a key inside the repository.
 - POSIX key permissions must be `0600` or stricter.
 - CI production signing runs only in the protected `firmware-production`
   environment.
@@ -59,14 +59,14 @@ dist/releases/fw-vN/
   removed on job exit.
 - Release output contains only the public key.
 - Production server/publisher configuration separately pins the authorized
-  public-key SPKI SHA-256 in `PHASE15_TRUSTED_KEY_SHA256`.
+  public-key SPKI SHA-256 in `SDOTA_TRUSTED_KEY_SHA256`.
 - The protected CI release environment also pins that fingerprint and refuses
   publication if the generated release uses a different key.
 
 ## Local release
 
 ```bash
-python3 tools/phase15_release.py \
+python3 tools/release.py \
   --target /path/to/application-v3.bin \
   --target-version 3 \
   --base /path/to/application-v2.bin \

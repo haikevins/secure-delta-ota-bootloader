@@ -41,14 +41,14 @@ _SHA256_HEX = re.compile(r"^[0-9a-fA-F]{64}$")
 def trusted_key_hash(args: argparse.Namespace, *, required: bool) -> str | None:
     value = getattr(args, "trusted_key_sha256", None)
     if value is None:
-        value = os.environ.get("PHASE15_TRUSTED_KEY_SHA256")
+        value = os.environ.get("SDOTA_TRUSTED_KEY_SHA256")
     if value is not None:
         value = value.strip().lower()
     if not value:
         if required:
             raise ManifestError(
                 "trusted release key pin required: use --trusted-key-sha256 "
-                "or PHASE15_TRUSTED_KEY_SHA256"
+                "or SDOTA_TRUSTED_KEY_SHA256"
             )
         return None
     if not _SHA256_HEX.fullmatch(value):
@@ -79,7 +79,7 @@ def command_for(args: argparse.Namespace):
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Secure Delta OTA Phase-15 release server/publisher"
+        description="Secure Delta OTA release server and MQTT publisher"
     )
     sub = parser.add_subparsers(dest="action", required=True)
 
@@ -131,15 +131,15 @@ def main() -> int:
     )
     publish.add_argument(
         "--client-id",
-        default="sdota-phase15-release-publisher",
+        default="sdota-release-publisher",
     )
     publish.add_argument(
         "--username",
-        default=os.environ.get("PHASE15_MQTT_USERNAME"),
+        default=os.environ.get("SDOTA_MQTT_USERNAME"),
     )
     publish.add_argument(
         "--password",
-        default=os.environ.get("PHASE15_MQTT_PASSWORD"),
+        default=os.environ.get("SDOTA_MQTT_PASSWORD"),
     )
 
     args = parser.parse_args()
@@ -154,7 +154,7 @@ def main() -> int:
                 ),
             )
             print(
-                f"PHASE15_RELEASE_VERIFY=PASS "
+                f"RELEASE_VERIFY=PASS "
                 f"release={manifest.release_id} "
                 f"target=v{manifest.target_version} "
                 f"artifacts={len(manifest.artifacts)}"
@@ -192,8 +192,8 @@ def main() -> int:
         encoded = encode_command(payload)
 
         if args.action == "command":
-            print(f"PHASE15_SELECTED={artifact.kind} file={artifact.filename}")
-            print(f"PHASE15_TOPIC={topic}")
+            print(f"RELEASE_SELECTED={artifact.kind} file={artifact.filename}")
+            print(f"RELEASE_TOPIC={topic}")
             print(encoded.decode("utf-8").rstrip())
             return 0
 
@@ -209,7 +209,7 @@ def main() -> int:
             encoded.rstrip(b"\n"),
         )
         print(
-            f"PHASE15_MQTT_PUBLISH=PASS topic={topic} "
+            f"MQTT_PUBLISH=PASS topic={topic} "
             f"release={manifest.release_id} "
             f"artifact={artifact.kind} target=v{manifest.target_version}"
         )
@@ -217,7 +217,7 @@ def main() -> int:
         return 0
 
     except (ManifestError, FirmwareSelectionError, RuntimeError) as exc:
-        print(f"Phase 15 server: FAIL: {exc}", file=sys.stderr)
+        print(f"Release server: FAIL: {exc}", file=sys.stderr)
         return 1
 
 

@@ -7,7 +7,7 @@ LOCAL_C_SOURCES := \
   src/ota_agent.c \
   src/ota_receiver.c \
   src/trial_confirmation.c \
-  src/phase4_flash_selftest.c \
+  src/flash_selftest.c \
   drivers/uart.c \
   protocol/cobs.c \
   protocol/ota_packet.c \

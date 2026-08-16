@@ -614,7 +614,7 @@ esp_err_t MqttOrchestrator_PublishProgress(
 
     /*
      * QoS-0 progress is telemetry, not durable state. Send it immediately
-     * from the Phase-11 worker instead of enqueue(store=false), because
+     * from the MQTT orchestration worker instead of enqueue(store=false), because
      * ESP-MQTT does not retain QoS-0 messages in that enqueue mode.
      */
     return (esp_mqtt_client_publish(

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic JojoDiff-compatible patch generator/applicator.
 
-Phase 12 emits the subset of the JojoDiff stream understood by JANPatch:
+delta generation emits the subset of the JojoDiff stream understood by JANPatch:
 EQL, MOD, INS and DEL. Matching blocks are monotonic, so BKT is not needed.
 """
 from __future__ import annotations

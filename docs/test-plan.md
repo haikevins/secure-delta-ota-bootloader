@@ -1,6 +1,6 @@
 # Verification and Test Plan
 
-Status: Phase 7 recovery coverage added
+Status: deterministic power-loss recovery coverage included
 
 ## Required test categories
 
@@ -71,7 +71,7 @@ Status: Phase 7 recovery coverage added
 
 At least 100 automated update cycles with fault injection and no unrecoverable brick before the project is declared complete.
 
-## Phase 2 hardware acceptance
+## boot metadata hardware acceptance
 
 - flash the combined image at `0x08000000`;
 - observe five bootloader flashes, a pause, then the application heartbeat;
@@ -85,7 +85,7 @@ At least 100 automated update cycles with fault injection and no unrecoverable b
   rejection.
 
 
-## Phase 7 power-loss acceptance
+## power-loss recovery power-loss acceptance
 
 Host/model:
 

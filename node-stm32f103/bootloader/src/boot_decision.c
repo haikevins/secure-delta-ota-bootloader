@@ -82,7 +82,7 @@ BootDecision_t BootDecision_Evaluate(const BootMetadata_t *metadata,
     {
         /*
          * A trial image with invalid vectors is never allowed to strand the
-         * product. Phase 8 restores the validated external backup instead.
+         * product. trial boot and rollback restores the validated external backup instead.
          */
         decision.action = BOOT_ACTION_RESUME_ROLLBACK;
         decision.reason = BOOT_DECISION_REASON_APPLICATION_INVALID;

@@ -229,7 +229,7 @@ esp_err_t WifiStation_Connect(const char *ssid,
             return ESP_FAIL;
         }
 
-        ESP_LOGI(TAG, "P15_WIFI_PS=PASS mode=none");
+        ESP_LOGI(TAG, "WIFI_PS=PASS mode=none");
         ESP_LOGI(TAG, "Wi-Fi connected to SSID '%s'", ssid);
 
         /*

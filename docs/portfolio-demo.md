@@ -1,64 +1,57 @@
-# Portfolio Demo — 5-minute path
+# 5-Minute Portfolio Demo
 
-This is a **5-minute** explanation/demo plan. The full HIL matrix is longer and
-is shown as recorded evidence unless there is enough time to run it live.
+## 0:00–0:45 — Architecture
 
-## 0:00–1:00 — Architecture
+Show `README.md` and explain the split trust model: ESP32 handles network transport; STM32 bootloader remains authoritative for signature verification, version policy, patching, install and rollback.
 
-Open `docs/portfolio-one-page.md` and explain:
+## 0:45–1:30 — Memory and protocol
 
-- ESP32 handles Internet/TLS and caches the artifact.
-- STM32 owns the trust decision and internal-flash state machine.
-- W25Q holds Incoming, Reconstructed and Backup images.
-- MQTT orchestrates; HTTPS carries bytes; UART bridges the two MCUs.
+Open:
 
-## 1:00–2:00 — Security + delta
+```text
+docs/memory-map.md
+docs/uart-ota-protocol.md
+```
 
-Show the SDOT layout and the JojoDiff path. Emphasize that a delta is accepted
-only after signed-container verification and exact-base verification.
+Highlight the 24 KiB bootloader budget, 38 KiB application partition, 128 KiB staging partitions and the COBS UART packet with sequence/offset/retry/resume.
+
+## 1:30–2:15 — Secure release
+
+Show:
+
+```text
+tools/release.py
+tools/secure_container.py
+node-stm32f103/bootloader/include/trusted_key.h
+```
+
+Explain SHA-256 + ECDSA P-256, key ID, anti-downgrade and the intentionally unprovisioned checked-in trust anchor.
+
+## 2:15–3:10 — Delta and recovery
+
+Show the JojoDiff generator and STM32 streaming patch adapter. Then open `tests/fault/fault_matrix.json` and highlight deterministic resets during patch, backup, install and rollback.
+
+## 3:10–4:10 — Hardware evidence
+
+Open `docs/hil-results.md`. Show the **9/9 PASS** result, including tampered-signature rejection and exact v1 restoration after reset during rollback.
+
+To reproduce on hardware:
+
+```bash
+make hil-test \
+  ESP32_PORT=/dev/ttyUSB0 \
+  WIFI_SSID="..." \
+  WIFI_PASSWORD="..." \
+  SDOTA_HOST_IP=<PC_LAN_IP>
+```
+
+## 4:10–5:00 — Benchmark and closure
 
 Run:
 
 ```bash
-make phase17-check
+make check TOOLCHAIN=gcc
+make benchmark TOOLCHAIN=gcc
 ```
 
-Point out the 24 KiB/38 KiB footprint budgets and signed-delta savings.
-
-## 2:00–3:00 — Release pipeline
-
-Show `tools/phase15_release.py` and `.github/workflows/firmware-release.yml`:
-
-- immutable release ID;
-- exact previous published binary;
-- full fallback;
-- external signing-key custody;
-- key fingerprint authorization.
-
-## 3:00–4:00 — Fault evidence
-
-Open `tests/fault/phase16_fault_matrix.json`. Highlight:
-
-- `install-midpage-reset`;
-- `mqtt-drop-after-accepted`;
-- `tampered-signature`;
-- `rollback-reset`.
-
-Explain that fault hooks are checkpoint-based, not random sleeps.
-
-## 4:00–5:00 — Hardware proof
-
-Show the final Phase-16 result:
-
-```text
-Phase 16 fault injection/HIL hardware test: PASS (9 deterministic scenarios)
-```
-
-If hardware/time is available, the full command is:
-
-```bash
-make phase16-hw-test   ESP32_PORT=/dev/ttyUSB0   WIFI_SSID="..."   WIFI_PASSWORD="..."   PHASE16_HOST_IP=<PC_LAN_IP>
-```
-
-Close with the result: a bad or interrupted update never becomes the confirmed
-active firmware; rollback restores the exact known-good image.
+Show `dist/benchmark/benchmark.md` and the measured flash/delta figures. End with the key claim: a secure delta OTA system that was validated not only on the happy path but under deterministic power-loss, transport and signature-failure scenarios.

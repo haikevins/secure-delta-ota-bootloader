@@ -33,7 +33,7 @@ HttpsDownloadPolicyStatus_t HttpsDownload_ValidateResponse(
     }
 
     /*
-     * Phase 10 deliberately requires Content-Length. That lets the gateway
+     * HTTPS transport deliberately requires Content-Length. That lets the gateway
      * erase exactly the needed cache range before streaming and prevents an
      * unbounded response from consuming the partition.
      */

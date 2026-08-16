@@ -7,7 +7,7 @@
 #include "memory_map.h"
 
 _Static_assert(sizeof(UpdateHandoffRecord_t) == 36U,
-               "Phase 6 handoff persistent layout changed");
+               "full-image OTA handoff persistent layout changed");
 _Static_assert(offsetof(UpdateHandoffRecord_t, crc32) == 32U,
                "handoff CRC must be the final field");
 

@@ -1,4 +1,4 @@
-# uart_ota — Phase 9
+# uart_ota — ESP32 gateway integration
 
 ESP-IDF implementation of the frozen STM32 UART OTA protocol v1:
 

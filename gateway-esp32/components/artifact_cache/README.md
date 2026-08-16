@@ -1,9 +1,9 @@
-# artifact_cache — Phase 10
+# artifact_cache — HTTPS transport
 
 The ESP32 `stm32_cache` partition remains the persistent source consumed by
 the UART gateway.
 
-Phase 10 adds a transactional streaming writer for HTTPS:
+HTTPS transport adds a transactional streaming writer for HTTPS:
 
 ```text
 invalidate header
@@ -18,4 +18,4 @@ A reset or power loss before the final header commit leaves no valid cache
 record. `ArtifactCache_Open()` also recomputes the complete stored image CRC
 before exposing an artifact to the UART layer.
 
-The persistent header format remains compatible with Phase 9.
+The persistent header format remains compatible with ESP32 gateway integration.

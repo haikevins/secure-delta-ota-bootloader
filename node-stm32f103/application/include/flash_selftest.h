@@ -1,0 +1,27 @@
+#ifndef FLASH_SELFTEST_H
+#define FLASH_SELFTEST_H
+
+#include <stdint.h>
+
+#define FLASH_SELFTEST_NOT_RUN        0x00000000UL
+#define FLASH_SELFTEST_RUNNING        0x52554E34UL
+#define FLASH_SELFTEST_PASS           0x50415353UL
+#define FLASH_SELFTEST_FAIL_INIT      0xE4040001UL
+#define FLASH_SELFTEST_FAIL_ID        0xE4040002UL
+#define FLASH_SELFTEST_FAIL_ERASE1    0xE4040003UL
+#define FLASH_SELFTEST_FAIL_BLANK1    0xE4040004UL
+#define FLASH_SELFTEST_FAIL_WRITE     0xE4040005UL
+#define FLASH_SELFTEST_FAIL_READ      0xE4040006UL
+#define FLASH_SELFTEST_FAIL_COMPARE   0xE4040007UL
+#define FLASH_SELFTEST_FAIL_VERIFY    0xE4040008UL
+#define FLASH_SELFTEST_FAIL_BOUNDS    0xE4040009UL
+#define FLASH_SELFTEST_FAIL_ERASE2    0xE404000AUL
+#define FLASH_SELFTEST_FAIL_BLANK2    0xE404000BUL
+
+extern volatile uint32_t g_flash_selftest_status;
+extern volatile uint32_t g_flash_selftest_jedec_id;
+extern volatile uint32_t g_flash_selftest_driver_status;
+
+void FlashSelfTest_Run(void);
+
+#endif

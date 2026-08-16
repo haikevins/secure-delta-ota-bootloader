@@ -14,5 +14,5 @@ idf_component_register(
         mqtt_orchestrator
         esp_timer
     EMBED_TXTFILES
-        "phase11_test_ca.pem"
+        "test_ca.pem"
 )

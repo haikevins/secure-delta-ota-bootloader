@@ -1,8 +1,8 @@
-# Phase 3 Metadata and Boot Decision
+# Persistent Metadata and Boot Decision
 
 ## 1. Purpose
 
-Phase 3 adds the first persistent boot state. It does **not** install OTA images.
+persistent metadata adds the first persistent boot state. It does **not** install OTA images.
 Its responsibilities are:
 
 - persist a CRC-protected `BootMetadata_t` record;
@@ -15,7 +15,7 @@ Its responsibilities are:
 
 ## 2. Internal Flash revision
 
-The Phase 0 single-page placeholder is replaced by two 1 KiB pages:
+The initial scaffold single-page placeholder is replaced by two 1 KiB pages:
 
 ```text
 0x08000000  Bootloader       24 KiB
@@ -62,29 +62,29 @@ retain their expected ordering.
 
 ## 5. First boot
 
-A combined Phase 3 image leaves both metadata pages erased. On first reset:
+A combined persistent metadata image leaves both metadata pages erased. On first reset:
 
 1. neither copy validates;
 2. bootloader creates `UPDATE_IDLE` defaults for `APPLICATION_VERSION`;
 3. defaults are committed to slot A as generation 1;
 4. the active application vectors are validated;
-5. bootloader performs the Phase 2 handoff.
+5. bootloader performs the boot metadata handoff.
 
 If metadata programming fails but the active application vectors are valid,
-Phase 3 uses a finalized RAM default for that boot. This prevents a metadata
+persistent metadata uses a finalized RAM default for that boot. This prevents a metadata
 hardware fault from bricking an otherwise valid pre-OTA product image.
 
 ## 6. Boot decision ownership
 
 `BootDecision_Evaluate()` is host-testable and has no peripheral dependency.
 It maps persisted states to actions such as resume download, restart patch,
-resume install, boot trial or rollback. Phase 3 executes only safe active-image
+resume install, boot trial or rollback. persistent metadata executes only safe active-image
 jumps (`IDLE`, `RECEIVING`, non-expired `TRIAL_BOOT`). Actions owned by later
-phases remain in bootloader recovery with a nine-pulse PC13 pattern.
+states remain in bootloader recovery with a nine-pulse PC13 pattern.
 
 ## 7. LED diagnostics
 
-- 1–6 pulses: invalid application vector reason from Phase 2;
+- 1–6 pulses: invalid application vector reason from boot metadata;
 - 8 pulses: metadata storage/load fatal error;
-- 9 pulses: a valid metadata state requires a later-phase recovery action;
+- 9 pulses: a valid metadata state requires a recovery action;
 - five fast pulses followed by application heartbeat: active image booted.

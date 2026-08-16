@@ -1,23 +1,21 @@
 # Benchmarks
 
-Phase 17 keeps one checked-in reference snapshot plus a reproducible generator.
-
-Run:
+Run the live benchmark with:
 
 ```bash
-make phase17-benchmark
+make benchmark TOOLCHAIN=gcc
 ```
 
-Outputs are written to `dist/phase17/`:
+or:
 
-- `phase17_benchmark.json` — machine-readable metrics;
-- `phase17_benchmark.csv` — spreadsheet-friendly summary;
-- `phase17_benchmark.md` — portfolio-friendly table.
+```bash
+make benchmark TOOLCHAIN=clang
+```
 
-The checked-in `phase17_reference.*` files are a reference measurement from the
-final Phase-17 source tree. Absolute build times are host-specific and are not
-used as pass/fail thresholds. Portable claims are firmware footprint, raw and
-signed delta savings, partition utilization, and the Phase-16 9/9 HIL result.
+Generated files:
 
-The benchmark creates an ephemeral P-256 private key only inside a temporary
-directory. It is deleted after signed-artifact size measurement.
+- `dist/benchmark/benchmark.json` — machine-readable metrics;
+- `dist/benchmark/benchmark.csv` — spreadsheet-friendly summary;
+- `dist/benchmark/benchmark.md` — human-readable portfolio table.
+
+The checked-in `reference.*` files are a reproducible reference measurement. Compiler and host timing can vary, so the automated pass/fail policy is based on partition budgets, delta savings, artifact capacity and recorded HIL closure rather than exact wall-clock time.

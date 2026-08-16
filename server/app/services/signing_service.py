@@ -87,7 +87,7 @@ def public_key_sha256(private_key: Path) -> str:
 
 
 def sign_bytes_der(private_key: Path, message: bytes) -> bytes:
-    with tempfile.TemporaryDirectory(prefix="phase15-sign-") as td:
+    with tempfile.TemporaryDirectory(prefix="release pipeline-sign-") as td:
         tmp = Path(td)
         message_path = tmp / "message.bin"
         signature_path = tmp / "signature.der"
@@ -112,7 +112,7 @@ def verify_signature_der(
     message: bytes,
     signature: bytes,
 ) -> None:
-    with tempfile.TemporaryDirectory(prefix="phase15-verify-") as td:
+    with tempfile.TemporaryDirectory(prefix="release pipeline-verify-") as td:
         tmp = Path(td)
         message_path = tmp / "message.bin"
         signature_path = tmp / "signature.der"

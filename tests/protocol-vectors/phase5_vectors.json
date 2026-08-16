@@ -1,8 +1,0 @@
-[
-  {
-    "name": "phase5-data-zero-bytes",
-    "raw_packet_hex": "5aa5011178563412000100000700060000010200feff2dd7bae6",
-    "cobs_frame_hex": "095aa5011178563412020101020702060103010207feff2dd7bae600",
-    "crc32": "0xE6BAD72D"
-  }
-]

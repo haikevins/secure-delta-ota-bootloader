@@ -1,6 +1,6 @@
 # Boot and Update State Machine
 
-Status: **Phase 8 full-image trial boot and rollback implemented; delta/security states remain planned**
+Status: **trial boot and rollback full-image trial boot and rollback implemented; delta/security states remain planned**
 
 ## 1. Update states
 
@@ -83,7 +83,7 @@ FAILED permits a new START after explicit cleanup.
 ```
 
 
-## Phase 8 implemented full-image path
+## trial boot and rollback implemented full-image path
 
 ```text
 RECEIVING -> ARTIFACT_READY
@@ -175,7 +175,7 @@ typedef struct
 ```
 
 Internal Flash contains complete Metadata A and B records in separate 1 KiB erase pages at `0x0800F800` and `0x0800FC00`. A new record is written to the older/invalid page, read back, CRC-validated and byte-compared. The currently selected page is not erased until a newer verified copy exists. External Metadata A/B contains the 36-byte CRC-protected
-application-to-bootloader install handoff at offset `0x000` and, from Phase 7,
+application-to-bootloader install handoff at offset `0x000` and, from power-loss recovery,
 a 40-byte CRC-protected persistent download checkpoint at offset `0x100`.
 The storage layers preserve the other record type across the 4 KiB sector erase.
 
