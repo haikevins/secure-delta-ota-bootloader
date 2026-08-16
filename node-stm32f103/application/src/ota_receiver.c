@@ -338,7 +338,6 @@ static bool CalculateIncomingCrc(uint32_t length, uint32_t *crc_out)
 }
 
 
-#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
 static bool CalculateIncomingCrcRange(uint32_t offset,
                                       uint32_t length,
                                       uint32_t *crc_out)
@@ -412,7 +411,6 @@ static bool ReadDeltaHeader(DeltaPatchHeader_t *header,
 
     return status == DELTA_PATCH_HEADER_VALID;
 }
-#endif
 
 static uint8_t IncomingLooksLikeSecureContainer(void)
 {
@@ -431,7 +429,6 @@ static uint8_t IncomingLooksLikeSecureContainer(void)
         GetU32Le(magic) == FW_CONTAINER_MAGIC);
 }
 
-#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
 static uint8_t IncomingLooksLikeDelta(void)
 {
     uint8_t magic[4];
@@ -448,7 +445,6 @@ static uint8_t IncomingLooksLikeDelta(void)
     return (uint8_t)(
         GetU32Le(magic) == DELTA_PATCH_MAGIC);
 }
-#endif
 
 static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
 {
@@ -777,7 +773,6 @@ static void ProcessFinish(const OtaPacket_t *request, OtaPacket_t *response)
     Ack(request, response);
 }
 
-#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
 static bool ValidateIncomingApplication(uint32_t *detail)
 {
     uint8_t vector[8];
@@ -986,7 +981,6 @@ static bool PersistDeltaInstallRequest(
 
     return true;
 }
-#endif
 
 static bool PersistSecureInstallRequest(uint32_t *detail)
 {

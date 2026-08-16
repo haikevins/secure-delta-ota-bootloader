@@ -164,9 +164,7 @@ void BootManager_Run(void)
     MetadataStorageStatus_t storage_status;
     BootDecision_t decision;
     ImageInstallerStatus_t installer_status;
-#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
     DeltaPatcherStatus_t delta_status;
-#endif
     SecureContainerStatus_t secure_status;
     TrialBootStatus_t trial_status;
     uint8_t application_valid;
