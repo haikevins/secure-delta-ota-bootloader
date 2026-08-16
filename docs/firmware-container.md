@@ -1,6 +1,6 @@
 # Secure Firmware Container Specification Version 1
 
-Status: **Frozen for Phase 0**
+Status: **Frozen for initial scaffold**
 
 ## 1. Goals
 
@@ -78,7 +78,7 @@ typedef struct
 #define FW_SIGNATURE_ED25519          2U
 ```
 
-The exact production signature algorithm is intentionally selected in Phase 14 after code-size measurement. Protocol version 1 reserves identifiers for ECDSA-P256 and Ed25519. Phase 0 requires a signed-container interface but does not falsely claim that either implementation already fits the 24 KiB bootloader budget.
+The exact production signature algorithm is intentionally selected in signed secure container after code-size measurement. Protocol version 1 reserves identifiers for ECDSA-P256 and Ed25519. initial scaffold requires a signed-container interface but does not falsely claim that either implementation already fits the 24 KiB bootloader budget.
 
 ## 5. Version encoding
 
@@ -140,7 +140,7 @@ No internal application erase may begin before all applicable checks pass and ba
 
 ## 10. Product identity
 
-Initial fixed values are placeholders until board/product registration in Phase 1:
+Initial fixed values are placeholders until board/product registration in platform bring-up:
 
 ```c
 #define PRODUCT_ID_STM32F103_NODE  0x00001001UL
@@ -149,7 +149,7 @@ Initial fixed values are placeholders until board/product registration in Phase 
 
 They are explicitly present in the signed header rather than inferred only from signing keys.
 
-## 11. Unsupported Phase 0 features
+## 11. Unsupported initial scaffold features
 
 The following flags are not allowed in format version 1 implementation until explicitly added:
 
@@ -161,22 +161,22 @@ The following flags are not allowed in format version 1 implementation until exp
 - writable calibration/configuration segments.
 
 
-## Phase 6 compatibility note
+## full-image OTA compatibility note
 
-The secure container format above remains the target format, but Phase 6 does
-not parse or authenticate it yet. The Phase-6 basic full OTA test transfers the
+The secure container format above remains the target format, but full-image OTA does
+not parse or authenticate it yet. The full-image OTA basic full OTA test transfers the
 raw linker-produced `application.bin`; the START payload plus the external
 handoff record carries image size, target version and CRC32. Secure container
-parsing/signature verification is introduced in later phases without changing
+parsing/signature verification can evolve without changing
 the internal application load address.
 
 
-## Phase 12 compatibility note
+## delta generation compatibility note
 
-Phase 12 now generates and host-verifies the delta payload format used by
+delta generation now generates and host-verifies the delta payload format used by
 `FW_IMAGE_DELTA`.
 
-The generated payload is a JojoDiff-compatible stream and the Phase-12 JSON
+The generated payload is a JojoDiff-compatible stream and the delta generation JSON
 metadata records the exact values needed for later secure-container assembly:
 
 ```text
@@ -190,28 +190,28 @@ target_image_sha256
 payload_crc32
 ```
 
-Phase 12 does not yet serialize the final signed container header and does not
-claim authenticity. Container signing remains a later phase. STM32 patch
-application starts in Phase 13.
+delta generation does not yet serialize the final signed container header and does not
+claim authenticity. Container signing is provided by the SDOT secure-container layer. STM32 patch
+application starts in streaming delta reconstruction.
 
 
-## Phase 13 functional-envelope note
+## streaming delta reconstruction functional-envelope note
 
-Phase 13 introduces a temporary 48-byte `D13P` engineering envelope around
+streaming delta reconstruction introduces a temporary 48-byte `D13P` engineering envelope around
 the JojoDiff-compatible payload so the STM32 bootloader can persist exact
 base/target sizes, versions and CRC32 values across reset.
 
 `D13P` is not the final secure container and is not signed. It exists only to
-exercise the complete embedded delta path before the signed-container phase.
+exercise the complete embedded delta path together with the signed-container path.
 The frozen `FirmwareContainerHeader_t` remains the target authenticated
 container format.
 
 
-## Phase 14 implementation note
+## signed secure container implementation note
 
-Phase 14 now implements the previously reserved signed-container interface.
+signed secure container now implements the previously reserved signed-container interface.
 
-The Phase-0 fixed header remains 120 bytes. A signed `SCX1` extension v1 adds
+The initial scaffold fixed header remains 120 bytes. A signed `SCX1` extension v1 adds
 20 bytes, so the implemented canonical `header_size` is 140 bytes.
 
 `SCX1` carries:
@@ -232,9 +232,9 @@ signature encoding  = big-endian r[32] || s[32]
 ```
 
 The signature covers the complete 140-byte header plus payload. Unsigned raw
-full and Phase-13 D13P artifacts are disabled by default in Phase 14.
+full and streaming delta reconstruction D13P artifacts are disabled by default in signed secure container.
 
 The private signing key remains host-side. The STM32 bootloader contains only a
 public P-256 trust anchor and key ID.
 
-Key custody, release authorization and server publication remain Phase 15.
+Key custody, release authorization and server publication remain release pipeline.

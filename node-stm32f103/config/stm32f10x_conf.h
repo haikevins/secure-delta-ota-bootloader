@@ -2,9 +2,9 @@
 #define STM32F10X_CONF_H
 
 /*
- * SPL configuration through Phase 4.
+ * SPL configuration through external-flash integration.
  *
- * Only modules compiled by the current image are exposed here. Later phases
+ * Only modules compiled by the current image are exposed here. Additional features
  * extend this file when USART, SPI, internal Flash, CRC and watchdog drivers
  * enter the build. Keeping the list synchronized prevents accidental linkage
  * against vendor modules that are not part of the image.

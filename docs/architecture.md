@@ -1,6 +1,6 @@
 # System Architecture Specification
 
-Status: **Frozen through Phase 4**
+Status: **Frozen through external-flash integration**
 
 ## 1. Objective
 
@@ -110,7 +110,7 @@ Stores:
 7. Installation begins only after the incoming artifact and reconstructed target image have been validated.
 8. Backup is retained until the trial application is confirmed.
 9. Metadata updates use two copies, CRC32 and monotonic generation number.
-10. Phase 0 excludes bootloader self-update, AES encryption, LoRa, CAN/UDS and multi-node scheduling.
+10. initial scaffold excludes bootloader self-update, AES encryption, LoRa, CAN/UDS and multi-node scheduling.
 
 ## 5. Initial hardware assignments
 
@@ -123,7 +123,7 @@ Stores:
 | SPI NOR MISO | PA6 / SPI1_MISO |
 | SPI NOR MOSI | PA7 / SPI1_MOSI |
 | SPI NOR CS | PB0 GPIO output |
-| Debug | Initially shared USART or optional USART2 in later phase |
+| Debug | Shared USART for OTA/debug or optional USART2 for dedicated debug |
 
 ## 6. Update selection policy
 
@@ -137,7 +137,7 @@ Use delta only when all conditions are true:
 
 Otherwise, use the full container.
 
-## 7. Phase 0 acceptance
+## 7. initial scaffold acceptance
 
 - Hardware, memory and protocol decisions are explicitly documented.
 - No internal or external partition overlaps.
@@ -146,7 +146,7 @@ Otherwise, use the full container.
 - Security trust boundary and out-of-scope items are documented.
 
 
-## Phase 14 trust-boundary update
+## signed secure container trust-boundary update
 
 The bootloader now enforces firmware authenticity using signed SDOT containers.
 ESP32, HTTPS, MQTT and UART remain transport/orchestration layers and do not

@@ -1,15 +1,15 @@
-# https_download — Phase 10
+# https_download — HTTPS transport
 
 This component performs an authenticated HTTPS GET and streams the response
 directly into the ESP32 `stm32_cache` partition.
 
-Phase-10 policy:
+HTTPS transport policy:
 
 - URL must use `https://`;
 - TLS server verification is mandatory;
 - HTTP status must be `200`;
 - a positive `Content-Length` is required;
-- chunked responses are rejected in Phase 10;
+- chunked responses are rejected in HTTPS transport;
 - the response may not exceed the STM32 application maximum;
 - cache header is invalidated before download;
 - cache data is written sequentially;

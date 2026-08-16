@@ -508,7 +508,7 @@ static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
           FW_ECDSA_P256_RAW_SIGNATURE_SIZE)) ||
         (artifact_size > EXT_INCOMING_SIZE))
     {
-#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
         if (artifact_size == 0UL)
         {
             Nack(request, OTA_STATUS_IMAGE_TOO_LARGE, artifact_size, response);
@@ -533,7 +533,7 @@ static void ProcessStart(const OtaPacket_t *request, OtaPacket_t *response)
         header_allowed = 1U;
     }
 
-#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
     if ((artifact_type == (uint8_t)FW_IMAGE_DELTA) &&
         (container_header_size == DELTA_PATCH_HEADER_SIZE))
     {
@@ -1064,7 +1064,7 @@ static void ProcessInstall(const OtaPacket_t *request, OtaPacket_t *response)
             return;
         }
     }
-#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
     else if (IncomingLooksLikeDelta() != 0U)
     {
         DeltaPatchHeader_t header;

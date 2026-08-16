@@ -3,6 +3,6 @@
 
 #include "esp_err.h"
 
-esp_err_t GatewayManager_RunPhase11(void);
+esp_err_t GatewayManager_Run(void);
 
 #endif

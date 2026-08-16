@@ -40,7 +40,7 @@ Application is structurally jumpable
 ```
 
 These are structural checks only. Cryptographic image validation is added in a
-later secure-container phase.
+secure-container path.
 
 ## Cleanup and transfer
 
@@ -74,7 +74,7 @@ handoff.
 
 ## Application proof
 
-The Phase 2 application:
+The boot metadata application:
 
 - verifies `SCB->VTOR == 0x08006000`;
 - configures SysTick for 1 ms ticks;

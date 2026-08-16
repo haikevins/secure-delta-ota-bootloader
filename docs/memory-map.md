@@ -1,6 +1,6 @@
 # Memory Map Specification
 
-Status: **Base map frozen; Phase 8 defines a sublayout inside Backup Image**
+Status: **Base map frozen; trial boot and rollback defines a sublayout inside Backup Image**
 
 All addresses are inclusive unless stated otherwise.
 
@@ -17,7 +17,7 @@ Nominal size: 64 KiB, `0x08000000`–`0x0800FFFF`.
 
 Total: 24 + 38 + 1 + 1 = 64 KiB.
 
-Phase 0 reserved one 1 KiB metadata placeholder. Phase 3 deliberately consumes
+initial scaffold reserved one 1 KiB metadata placeholder. persistent metadata deliberately consumes
 one additional page and reduces the application by 1 KiB so each redundant copy
 has an independent erase page. This is required for a power-loss-safe commit.
 
@@ -44,7 +44,7 @@ MEMORY
 
 Nominal SRAM: 20 KiB, `0x20000000`–`0x20004FFF`.
 
-Phase 3 adds only small stack-local metadata records. No persistent SRAM is
+persistent metadata adds only small stack-local metadata records. No persistent SRAM is
 shared across the bootloader/application handoff.
 
 ## 3. W25Q32 external SPI NOR Flash
@@ -53,27 +53,27 @@ Nominal size: 4 MiB, `0x000000`–`0x3FFFFF`.
 
 | Region | Start | End | Size | Purpose |
 |---|---:|---:|---:|---|
-| External Metadata A | `0x000000` | `0x000FFF` | 4 KiB | Install handoff A + Phase-7 download checkpoint A |
-| External Metadata B | `0x001000` | `0x001FFF` | 4 KiB | Install handoff B + Phase-7 download checkpoint B |
+| External Metadata A | `0x000000` | `0x000FFF` | 4 KiB | Install handoff A + power-loss recovery download checkpoint A |
+| External Metadata B | `0x001000` | `0x001FFF` | 4 KiB | Install handoff B + power-loss recovery download checkpoint B |
 | Incoming Artifact | `0x002000` | `0x021FFF` | 128 KiB | Full/delta secure container |
 | Reconstructed Image | `0x022000` | `0x041FFF` | 128 KiB | Reconstructed target image |
 | Backup Image | `0x042000` | `0x061FFF` | 128 KiB | Verified active-image backup |
 | Update Logs | `0x062000` | `0x071FFF` | 64 KiB | Bounded diagnostics |
 | Reserved | `0x072000` | `0x3FEFFF` | Remaining | Future use |
-| Phase 4 Self-test | `0x3FF000` | `0x3FFFFF` | 4 KiB | Destructive driver validation |
+| external-flash integration Self-test | `0x3FF000` | `0x3FFFFF` | 4 KiB | Destructive driver validation |
 
-The Phase 4 driver and storage abstraction enforce these bounds. External metadata does not replace the two internal boot-critical records introduced in Phase 3.
+The external-flash integration driver and storage abstraction enforce these bounds. External metadata does not replace the two internal boot-critical records introduced in persistent metadata.
 
-Phase 6/7 uses the first 36 bytes of each 4 KiB external metadata sector for
-the A/B install handoff record. Phase 7 additionally stores a 40-byte download
+full-image OTA/7 uses the first 36 bytes of each 4 KiB external metadata sector for
+the A/B install handoff record. power-loss recovery additionally stores a 40-byte download
 checkpoint at sector offset `0x100`. Because either record update requires a
 whole-sector erase, the storage layer preserves the other valid record while
 rewriting its target A/B sector.
 
 
-### Phase 8 Backup Image sublayout
+### trial boot and rollback Backup Image sublayout
 
-The 128 KiB Backup Image partition keeps its frozen outer boundaries. Phase 8
+The 128 KiB Backup Image partition keeps its frozen outer boundaries. trial boot and rollback
 uses it as:
 
 | Subregion | Relative offset | Absolute start | Purpose |

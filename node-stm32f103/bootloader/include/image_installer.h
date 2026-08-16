@@ -3,11 +3,11 @@
 
 #include "boot_metadata.h"
 
-#define IMAGE_INSTALLER_PHASE7_FAULT_MARKER 0xF7070001UL
+#define IMAGE_INSTALLER_FAULT_MARKER 0xF7070001UL
 
-#define IMAGE_INSTALLER_PHASE8_ROLLBACK_TRIAL_LIMIT_BASE 0x0008B000UL
-#define IMAGE_INSTALLER_PHASE8_ROLLBACK_INVALID_TRIAL    0x0008B100UL
-#define IMAGE_INSTALLER_PHASE8_ROLLBACK_INSTALL_BASE     0x0008B200UL
+#define IMAGE_INSTALLER_ROLLBACK_TRIAL_LIMIT_BASE 0x0008B000UL
+#define IMAGE_INSTALLER_ROLLBACK_INVALID_TRIAL    0x0008B100UL
+#define IMAGE_INSTALLER_ROLLBACK_INSTALL_BASE     0x0008B200UL
 
 typedef enum
 {
@@ -41,9 +41,9 @@ typedef enum
 } ImageInstallerStatus_t;
 
 /*
- * Historical name retained for Phase-6/7 callers. The function now installs
- * either a full candidate from Incoming Artifact or a Phase-13 reconstructed
- * delta candidate from Reconstructed Image, then reuses the Phase-8
+ * Historical name retained for full-image OTA/7 callers. The function now installs
+ * either a full candidate from Incoming Artifact or a streaming delta reconstruction reconstructed
+ * delta candidate from Reconstructed Image, then reuses the trial boot and rollback
  * backup/page-checkpoint/trial/rollback lifecycle.
  */
 ImageInstallerStatus_t ImageInstaller_ProcessBasicFull(

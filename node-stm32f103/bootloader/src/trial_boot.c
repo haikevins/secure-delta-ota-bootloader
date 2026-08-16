@@ -91,7 +91,7 @@ void TrialBoot_StartWatchdog(void)
 {
     /*
      * LSI is nominally ~40 kHz. Prescaler 64 / reload 3000 gives a several
-     * second health window across normal LSI tolerance. Healthy Phase-8
+     * second health window across normal LSI tolerance. Healthy trial boot and rollback
      * candidates confirm well before this deadline.
      */
     IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);

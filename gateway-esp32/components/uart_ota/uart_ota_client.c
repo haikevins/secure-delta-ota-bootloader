@@ -546,7 +546,7 @@ static esp_err_t FinishTransfer(UartOtaClient_t *client,
         return ESP_ERR_INVALID_STATE;
     }
 
-    /* Verify the idempotent FINISH retry contract from Phase 5. */
+    /* Verify the idempotent FINISH retry contract from UART OTA transport. */
     status = Request(client, &request, &response);
     if (status != ESP_OK)
     {
@@ -791,7 +791,7 @@ esp_err_t UartOta_TransferInstallAndWait(UartOtaClient_t *client,
                     /*
                      * INSTALL deliberately resets the STM32 after replying.
                      * The ACK can be lost at that boundary. Final target state
-                     * is authoritative, exactly like the Phase-6 PC client.
+                     * is authoritative, exactly like the full-image OTA PC client.
                      */
                     ESP_LOGW(TAG,
                              "INSTALL ACK uncertain: %s; waiting for target",

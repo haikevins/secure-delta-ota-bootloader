@@ -1,4 +1,4 @@
-menu "Secure Delta OTA Phase 11"
+menu "Secure Delta OTA Gateway"
 
 config SDOTA_STM32_UART_NUM
     int "STM32 UART controller"
@@ -17,19 +17,19 @@ config SDOTA_STM32_UART_RX_GPIO
     range 0 39
     default 16
 
-config SDOTA_PHASE11_GATEWAY_TASK_STACK_SIZE
-    int "Phase-11 gateway worker task stack size (bytes)"
+config SDOTA_GATEWAY_TASK_STACK_SIZE
+    int "Gateway worker task stack size (bytes)"
     range 8192 32768
     default 16384
     help
         Stack for the dedicated MQTT orchestration + HTTPS + UART OTA worker.
 
-config SDOTA_PHASE11_AUTORUN
-    bool "Run Phase-11 MQTT orchestration on boot"
+config SDOTA_AUTORUN
+    bool "Run MQTT orchestration on boot"
     default y
 
-config SDOTA_PHASE11_SINGLE_SHOT
-    bool "Process one MQTT update command then report PASS"
+config SDOTA_SINGLE_SHOT
+    bool "Process one MQTT update command then report a terminal result"
     default n
     help
         Intended mainly for deterministic hardware tests. Production normally
@@ -47,7 +47,7 @@ config SDOTA_MQTT_URI
     string "MQTT broker URI"
     default ""
     help
-        Production Phase 11 requires mqtts:// with server verification.
+        Production operation requires mqtts:// with server verification.
 
 config SDOTA_MQTT_CLIENT_ID
     string "MQTT client ID"

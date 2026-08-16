@@ -101,7 +101,7 @@ LDFLAGS := $(ARCH_FLAGS) $(TOOLCHAIN_LINK_FLAGS) \
   -Wl,--build-id=none \
   -Wl,--entry=Reset_Handler
 
-# Minimal SPL subset used by the Phase 1 heartbeat. Later phases add their
+# Minimal SPL subset used by the platform and application. Additional modules add their
 # required modules explicitly instead of linking the whole vendor library.
 SPL_C_SOURCES := \
   $(SPL_DIR)/src/misc.c \
@@ -113,7 +113,7 @@ C_SOURCES := $(LOCAL_C_SOURCES) $(SPL_C_SOURCES)
 ASM_SOURCES := $(LOCAL_ASM_SOURCES)
 
 # Keep object names flat. The selected source set intentionally has unique
-# basenames; phase1_check.py verifies this invariant.
+# basenames; the integrated checker verifies this invariant.
 C_OBJECTS := $(foreach source,$(C_SOURCES),$(BUILD_DIR)/$(notdir $(source:.c=.o)))
 ASM_OBJECTS := $(foreach source,$(ASM_SOURCES),$(BUILD_DIR)/$(notdir $(source:.s=.o)))
 OBJECTS := $(C_OBJECTS) $(ASM_OBJECTS)

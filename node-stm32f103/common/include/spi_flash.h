@@ -25,7 +25,7 @@ typedef enum
 /*
  * The OTA partition map intentionally remains limited to the first 4 MiB.
  * W25Q64 is accepted for development hardware because the basic SPI commands
- * used by Phase 4 are compatible; its upper 4 MiB is left unused.
+ * used by external-flash integration are compatible; its upper 4 MiB is left unused.
  */
 bool SpiFlash_IsSupportedJedecId(uint32_t jedec_id);
 bool SpiFlash_Init(void);

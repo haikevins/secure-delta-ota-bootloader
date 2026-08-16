@@ -37,7 +37,7 @@ esp_err_t TimeSync_UseTestEpoch(int64_t epoch_seconds)
     }
 
     ESP_LOGI(TAG,
-             "using Phase-10 test bootstrap epoch=%lld",
+             "using HTTPS transport test bootstrap epoch=%lld",
              (long long)epoch_seconds);
     return ESP_OK;
 }

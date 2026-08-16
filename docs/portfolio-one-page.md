@@ -1,75 +1,59 @@
-# Secure Delta OTA Bootloader — Portfolio One-Page
+# Secure Delta OTA Bootloader — One-Page Portfolio Summary
 
 ## Problem
 
-Deliver reliable remote firmware updates to a constrained **STM32F103C8T6**
-without trusting the network path and without bricking the device when power or
-transport fails.
+Safely update an STM32F103C8T6 over an unreliable network and power environment while keeping the constrained MCU free of a network/TLS stack.
 
-## System
+## Architecture
+
+- **STM32F103C8T6:** owns the update trust boundary, persistent state machine, delta reconstruction, install, trial boot and rollback.
+- **ESP32:** MQTTS orchestration, HTTPS artifact download/cache and UART forwarding.
+- **W25Q SPI NOR:** incoming artifact, reconstructed image, validated backup and persistent OTA checkpoints.
+- **Release tooling/server:** immutable signed full/delta releases and signed manifest verification.
+
+## Security
+
+- SHA-256 integrity.
+- ECDSA P-256 signatures.
+- signed SDOT container.
+- key-ID trust anchor.
+- anti-downgrade checks.
+- private signing key never embedded in device firmware.
+- unsigned secure-path artifacts rejected.
+
+## Delta update
+
+Host tooling generates a JojoDiff-compatible patch. STM32 reconstructs the target through a project-owned streaming adapter, validates the base image before patching, and validates the reconstructed target before installation.
+
+## Recovery
+
+The update process survives resets during:
+
+- patching;
+- backup;
+- internal-flash installation;
+- rollback.
+
+A candidate must confirm health. Failure triggers restoration from a separately validated backup.
+
+## Hardware evidence
+
+Deterministic HIL matrix: **9/9 PASS**.
+
+It includes MQTTS disconnect, truncated HTTPS transfer, signature tamper, rollback and reset-during-rollback cases.
+
+## Measured GCC result
 
 ```text
-CI / release signer
-      |
-      | signed SDOT metadata + HTTPS URL over MQTTS
-      v
-    ESP32
-      |
-      | HTTPS download/cache
-      | COBS-framed UART, ACK/NACK/resume
-      v
- STM32F103C8T6
-      |
-      +--> W25Q SPI NOR: incoming / reconstructed / backup / checkpoints
-      |
-      +--> ECDSA P-256 + SHA-256 verification
-      +--> JojoDiff-compatible streaming delta reconstruction
-      +--> backup -> install -> verify -> trial -> confirm
-      +--> rollback on unhealthy candidate
+Bootloader flash       9412 B / 24 KiB
+Application v2 flash   9648 B / 38 KiB
+Raw delta              1242 B
+Signed delta           1446 B
+Signed full            9852 B
+Raw savings            87.13%
+Signed savings         85.32%
 ```
 
-## Engineering highlights
+## Skills demonstrated
 
-- **Secure container:** SHA-256 + **ECDSA P-256**, key ID, signed metadata,
-  anti-downgrade, unsigned images disabled.
-- **Delta OTA:** JojoDiff-compatible host generator and project-owned streaming
-  patch adapter; full image remains available as fallback.
-- **Power-loss safety:** persistent checkpoints for patching, backup, internal
-  flash install, trial boot, and rollback.
-- **Transport:** HTTPS for bytes, MQTTS for orchestration/status, UART COBS
-  frames with CRC32, sequence, offset, ACK/NACK/retry/resume.
-- **External storage:** W25Q SPI NOR isolates incoming/reconstructed/backup data
-  from the active internal application.
-- **Release safety:** immutable signed releases, exact previous binary for delta,
-  external private-key custody, key fingerprint pinning, QoS1 terminal status.
-
-## Proof, not just design
-
-Physical Phase 16 HIL finished **9/9** deterministic scenarios:
-
-1. secure delta control;
-2. reset during patch;
-3. reset during backup;
-4. reset during internal-flash install;
-5. MQTT disconnect recovery;
-6. truncated HTTPS body rejection;
-7. transport-valid **tampered-signature** rejection;
-8. automatic rollback;
-9. reset during rollback.
-
-Final rollback test restored exact confirmed v1 and preserved rollback
-diagnostic `0x0008B003`.
-
-## Benchmark
-
-Run `make phase17-benchmark` for the final source-tree numbers. The checked-in
-reference shows bootloader/application footprint, raw and signed delta savings,
-and Incoming-partition occupancy. Absolute host build times are reported only
-as environment-specific observations.
-
-## Why this is portfolio-grade
-
-The repository connects embedded flash semantics, cryptographic trust,
-distributed transport, release engineering, deterministic fault injection and
-hardware evidence in one end-to-end system. Each major claim maps to a
-reproduction command in `docs/portfolio-evidence.md`.
+Embedded C, Cortex-M3 boot flow, linker/memory layout, SPI NOR constraints, persistent metadata, COBS UART protocol, binary diff/patch, SHA-256, ECDSA P-256, ESP-IDF, HTTPS, MQTTS, release engineering, deterministic fault injection, SWD/OpenOCD and HIL automation.

@@ -1,6 +1,6 @@
 # Threat Model
 
-Status: Phase 0 baseline
+Status: initial scaffold baseline
 
 ## Assets
 

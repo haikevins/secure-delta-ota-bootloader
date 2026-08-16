@@ -45,7 +45,7 @@ JanpatchPortStatus_t JanpatchPort_ApplyStream(
     const JanpatchPortStream_t *stream,
     JanpatchPortResult_t *result);
 
-/* Phase-13 compatibility wrapper around the generic stream API. */
+/* streaming delta reconstruction compatibility wrapper around the generic stream API. */
 JanpatchPortStatus_t JanpatchPort_Apply(
     const DeltaPatchHeader_t *header,
     JanpatchPortResult_t *result);

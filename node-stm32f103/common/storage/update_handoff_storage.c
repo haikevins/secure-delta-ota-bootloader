@@ -133,7 +133,7 @@ UpdateHandoffStorageStatus_t UpdateHandoffStorage_Commit(
     partition = PartitionForSlot(target);
 
     /*
-     * Phase 7 stores the UART download checkpoint at offset 0x100 in the same
+     * power-loss recovery stores the UART download checkpoint at offset 0x100 in the same
      * redundant external-metadata sectors. Preserve a valid checkpoint across
      * the sector erase required by a handoff update.
      */

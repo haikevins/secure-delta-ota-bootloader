@@ -7,7 +7,7 @@
 #include "memory_map.h"
 
 _Static_assert(sizeof(DownloadCheckpointRecord_t) == 40U,
-               "Phase 7 download checkpoint layout changed");
+               "power-loss recovery download checkpoint layout changed");
 _Static_assert(offsetof(DownloadCheckpointRecord_t, crc32) == 36U,
                "download checkpoint CRC must be final");
 

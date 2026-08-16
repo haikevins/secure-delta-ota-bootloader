@@ -48,7 +48,7 @@ SecureContainerStatus_t SecureContainer_LoadVerifiedInfo(
     FirmwareContainerInfo_t *info);
 
 /*
- * Owns Phase-14 states from ARTIFACT_READY through IMAGE_READY.
+ * Owns signed secure container states from ARTIFACT_READY through IMAGE_READY.
  * It authenticates the container, enforces version/base policy, reconstructs
  * into external Flash, verifies the target and commits IMAGE_READY.
  */

@@ -23,14 +23,14 @@ An empty value no longer disables auto-detection.
 ## Explicit selection
 
 ```bash
-make TOOLCHAIN=gcc phase2-check
+make TOOLCHAIN=gcc boot metadata-check
 make TOOLCHAIN=gcc flash-combined
 ```
 
 or:
 
 ```bash
-make TOOLCHAIN=clang phase2-check
+make TOOLCHAIN=clang boot metadata-check
 ```
 
 Any other non-empty value is rejected.

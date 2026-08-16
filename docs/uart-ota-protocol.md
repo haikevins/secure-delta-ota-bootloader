@@ -1,8 +1,8 @@
 # Custom UART OTA Protocol Version 1
 
-Status: **Protocol v1 frozen in Phase 0; UART/PC implemented in Phase 5; INSTALL in Phase 6; persistent resume in Phase 7**
+Status: **Protocol v1 frozen in initial scaffold; UART/PC implemented in UART OTA transport; INSTALL in full-image OTA; persistent resume in power-loss recovery**
 
-Phase 7 persists receive progress at complete 4 KiB W25Q sector boundaries.
+power-loss recovery persists receive progress at complete 4 KiB W25Q sector boundaries.
 The PC sender uses 256-byte DATA chunks, so these checkpoints are also packet
 boundaries. After reset, QUERY/RESUME returns the newest valid persisted
 offset and the first uncheckpointed sector is retransmitted.
@@ -171,7 +171,7 @@ An accepted START returns `ACK` with `next_expected_offset = 0`.
 - Node writes bytes to `EXT_INCOMING_ADDRESS + offset`.
 - Node verifies the written bytes or uses a storage policy that guarantees verification before ACK.
 - ACK is sent only after the DATA bytes have been written and verified in external Flash.
-- Phase 6 does not persist every acknowledged DATA offset; per-chunk power-loss recovery is Phase 7.
+- full-image OTA does not persist every acknowledged DATA offset; per-chunk power-loss recovery is power-loss recovery.
 
 ### Duplicate handling
 
@@ -191,7 +191,7 @@ last_error_detail         u32
 
 ## 11. FINISH behavior
 
-The Phase-6 full-image node checks:
+The full-image OTA full-image node checks:
 
 1. `received_size == expected_artifact_size`;
 2. complete incoming artifact CRC32.
@@ -207,7 +207,7 @@ For a basic full-image INSTALL, `INSTALL (0x20)` then:
 4. transmits ACK completely;
 5. resets into the bootloader.
 
-Secure container parsing/signature verification is added in later phases.
+Secure container parsing/signature verification is handled by the bootloader security boundary.
 
 ## 12. RESUME behavior
 

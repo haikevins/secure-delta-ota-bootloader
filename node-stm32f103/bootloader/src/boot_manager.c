@@ -190,7 +190,7 @@ void BootManager_Run(void)
         else
         {
             /*
-             * Retain the Phase-3 non-bricking fallback for a previously valid
+             * Retain the persistent metadata non-bricking fallback for a previously valid
              * factory image if the very first metadata commit fails.
              */
             metadata.generation = BOOT_METADATA_FIRST_GENERATION;
@@ -238,7 +238,7 @@ void BootManager_Run(void)
                 continue;
             }
 
-#if PHASE14_ALLOW_UNSIGNED_LEGACY != 0
+#if SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY != 0
             if (DeltaPatcher_IsDeltaArtifact() != 0U)
             {
                 delta_status =
@@ -268,7 +268,7 @@ void BootManager_Run(void)
             }
 #else
             /*
-             * Secure Phase-14 builds reject every unsigned legacy artifact.
+             * Secure signed secure container builds reject every unsigned legacy artifact.
              * SecureContainer_Process performs a safe IDLE rejection and
              * preserves the active application.
              */
@@ -387,7 +387,7 @@ void BootManager_Run(void)
 
         /*
          * Delta/secure-only states still deliberately remain in recovery until
-         * their later roadmap phases implement the owning action.
+         * the owning recovery action is executed.
          */
         BootManager_ShowFatalPulses(RECOVERY_ACTION_PULSES);
     }

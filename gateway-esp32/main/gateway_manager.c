@@ -21,8 +21,8 @@
 
 static const char *TAG = "gateway";
 
-extern const uint8_t phase11_test_ca_pem_start[]
-    asm("_binary_phase11_test_ca_pem_start");
+extern const uint8_t test_ca_pem_start[]
+    asm("_binary_test_ca_pem_start");
 
 typedef struct
 {
@@ -30,9 +30,9 @@ typedef struct
     uint32_t update_id;
     const char *stage;
     uint32_t last_percent;
-} Phase11ProgressContext_t;
+} GatewayProgressContext_t;
 
-static void ProgressReport(Phase11ProgressContext_t *context,
+static void ProgressReport(GatewayProgressContext_t *context,
                            uint32_t current,
                            uint32_t total,
                            const char *log_marker)
@@ -74,20 +74,20 @@ static void DownloadProgress(void *context,
                              uint32_t downloaded,
                              uint32_t total)
 {
-    ProgressReport((Phase11ProgressContext_t *)context,
+    ProgressReport((GatewayProgressContext_t *)context,
                    downloaded,
                    total,
-                   "P11_HTTPS_DATA");
+                   "OTA_HTTPS_DATA");
 }
 
 static void UartProgress(void *context,
                          uint32_t sent,
                          uint32_t total)
 {
-    ProgressReport((Phase11ProgressContext_t *)context,
+    ProgressReport((GatewayProgressContext_t *)context,
                    sent,
                    total,
-                   "P11_UART_DATA");
+                   "OTA_UART_DATA");
 }
 
 static esp_err_t ValidateConfiguration(const GatewayConfig_t *config)
@@ -99,7 +99,7 @@ static esp_err_t ValidateConfiguration(const GatewayConfig_t *config)
 
     if (!config->autorun)
     {
-        ESP_LOGW(TAG, "Phase-11 autorun disabled");
+        ESP_LOGW(TAG, "MQTT orchestration autorun disabled");
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -118,7 +118,7 @@ static esp_err_t ValidateConfiguration(const GatewayConfig_t *config)
         (config->mqtt_device_id[0] == '\0') ||
         (config->mqtt_ready_timeout_ms == 0UL))
     {
-        ESP_LOGE(TAG, "Phase-11 configuration invalid");
+        ESP_LOGE(TAG, "MQTT orchestration configuration invalid");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -137,7 +137,7 @@ static esp_err_t PublishFailure(MqttOrchestrator_t *mqtt,
     esp_err_t publish_status;
 
     ESP_LOGE(TAG,
-             "Phase-11 update failed: %s (%s)",
+             "MQTT orchestration update failed: %s (%s)",
              detail,
              esp_err_to_name(error));
 
@@ -180,8 +180,8 @@ static esp_err_t ProcessCommand(
     UartOtaArtifact_t artifact;
     UartOtaHelloInfo_t initial;
     UartOtaHelloInfo_t final_info;
-    Phase11ProgressContext_t https_progress;
-    Phase11ProgressContext_t uart_progress;
+    GatewayProgressContext_t https_progress;
+    GatewayProgressContext_t uart_progress;
     esp_err_t status;
 
     if ((config == NULL) || (mqtt == NULL) ||
@@ -191,7 +191,7 @@ static esp_err_t ProcessCommand(
     }
 
     ESP_LOGI(TAG,
-             "P11_COMMAND=PASS update_id=0x%08" PRIX32
+             "OTA_COMMAND=PASS update_id=0x%08" PRIX32
              " target=v%" PRIu32
              " size=%" PRIu32
              " crc32=0x%08" PRIX32,
@@ -210,7 +210,7 @@ static esp_err_t ProcessCommand(
     }
 
     ESP_LOGI(TAG,
-             "P11_HELLO=PASS app=v%" PRIu32
+             "STM32_HELLO=PASS app=v%" PRIu32
              " state=%u caps=0x%08" PRIX32,
              initial.application_version,
              initial.update_state,
@@ -233,7 +233,7 @@ static esp_err_t ProcessCommand(
         }
 
         ESP_LOGI(TAG,
-                 "P11_FINAL=PASS app=v%" PRIu32
+                 "OTA_FINAL=PASS app=v%" PRIu32
                  " state=IDLE already_current",
                  initial.application_version);
         return ESP_OK;
@@ -269,7 +269,7 @@ static esp_err_t ProcessCommand(
     download_config.progress = DownloadProgress;
     download_config.progress_context = &https_progress;
 
-    ESP_LOGI(TAG, "P11_HTTPS_GET %s", command->url);
+    ESP_LOGI(TAG, "OTA_HTTPS_GET %s", command->url);
 
     status = HttpsDownload_ToCache(
         &download_config,
@@ -300,7 +300,7 @@ static esp_err_t ProcessCommand(
     }
 
     ESP_LOGI(TAG,
-             "P11_HTTPS=PASS status=%d size=%" PRIu32
+             "OTA_HTTPS=PASS status=%d size=%" PRIu32
              " crc32=0x%08" PRIX32,
              download_result.status_code,
              download_result.downloaded_size,
@@ -376,12 +376,12 @@ static esp_err_t ProcessCommand(
     }
 
     ESP_LOGI(TAG,
-             "P11_FINAL=PASS app=v%" PRIu32 " state=IDLE",
+             "OTA_FINAL=PASS app=v%" PRIu32 " state=IDLE",
              final_info.application_version);
     return ESP_OK;
 }
 
-esp_err_t GatewayManager_RunPhase11(void)
+esp_err_t GatewayManager_Run(void)
 {
     const GatewayConfig_t config = GatewayConfig_Get();
     MqttOrchestrator_t mqtt;
@@ -393,7 +393,7 @@ esp_err_t GatewayManager_RunPhase11(void)
     esp_err_t status;
 
     ESP_LOGI(TAG,
-             "Phase 11 MQTT Orchestration Gateway: "
+             "Secure Delta OTA Gateway: "
              "tx_gpio=%d rx_gpio=%d device=%s",
              config.tx_gpio,
              config.rx_gpio,
@@ -417,17 +417,17 @@ esp_err_t GatewayManager_RunPhase11(void)
         return status;
     }
 
-    ESP_LOGI(TAG, "P11_WIFI=PASS");
+    ESP_LOGI(TAG, "WIFI=PASS");
 
     if (config.use_test_ca)
     {
         status = TimeSync_UseTestEpoch(config.test_epoch);
-        test_ca = (const char *)phase11_test_ca_pem_start;
+        test_ca = (const char *)test_ca_pem_start;
         if (status != ESP_OK)
         {
             return status;
         }
-        ESP_LOGI(TAG, "P11_TIME=PASS mode=test-bootstrap");
+        ESP_LOGI(TAG, "TIME_SYNC=PASS mode=test-bootstrap");
     }
     else
     {
@@ -438,12 +438,12 @@ esp_err_t GatewayManager_RunPhase11(void)
         {
             return status;
         }
-        ESP_LOGI(TAG, "P11_TIME=PASS mode=sntp");
+        ESP_LOGI(TAG, "TIME_SYNC=PASS mode=sntp");
     }
 
     ESP_LOGI(
         TAG,
-        "P15_RUNTIME_MQTT_URI=%s test_ca=%u",
+        "RUNTIME_MQTT_URI=%s test_ca=%u",
         config.mqtt_uri,
         config.use_test_ca ? 1U : 0U);
 
@@ -468,7 +468,7 @@ esp_err_t GatewayManager_RunPhase11(void)
         return status;
     }
 
-    ESP_LOGI(TAG, "P11_MQTT=PASS subscribed=command");
+    ESP_LOGI(TAG, "MQTT=PASS subscribed=command");
 
     memset(&uart_config, 0, sizeof(uart_config));
     uart_config.uart_num = config.uart_num;

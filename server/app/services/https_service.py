@@ -8,7 +8,7 @@ from urllib.parse import unquote, urlsplit
 
 
 class FirmwareRequestHandler(BaseHTTPRequestHandler):
-    server_version = "SDOTA-Phase15/1"
+    server_version = "SDOTA-release pipeline/1"
 
     def _send_file(self, *, head_only: bool) -> None:
         path = urlsplit(self.path).path
@@ -105,7 +105,7 @@ class FirmwareRequestHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: object) -> None:
         print(
-            f"PHASE15_HTTPS peer={self.client_address[0]} "
+            f"HTTPS peer={self.client_address[0]} "
             + (format % args),
             flush=True,
         )
@@ -132,7 +132,7 @@ def serve_https(
     server.socket = context.wrap_socket(server.socket, server_side=True)
 
     print(
-        f"PHASE15_HTTPS_READY bind={bind} port={port} "
+        f"HTTPS_READY bind={bind} port={port} "
         f"root={release_root.resolve()}",
         flush=True,
     )

@@ -74,7 +74,7 @@ esp_err_t HttpsDownload_ToCache(const HttpsDownloadConfig_t *config,
     if ((config->cert_pem == NULL) && !config->use_crt_bundle)
     {
         /*
-         * Phase 10 never permits HTTPS without server authentication.
+         * HTTPS transport never permits HTTPS without server authentication.
          */
         return ESP_ERR_INVALID_ARG;
     }

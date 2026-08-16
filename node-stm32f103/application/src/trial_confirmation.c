@@ -7,8 +7,8 @@
 #include "metadata_storage.h"
 #include "stm32f10x.h"
 
-#ifndef PHASE8_TRIAL_CONFIRM_DELAY_MS
-#define PHASE8_TRIAL_CONFIRM_DELAY_MS 750UL
+#ifndef TRIAL_CONFIRM_DELAY_MS
+#define TRIAL_CONFIRM_DELAY_MS 750UL
 #endif
 
 static uint8_t g_trial_active;
@@ -89,13 +89,13 @@ bool TrialConfirmation_ConfirmNow(uint32_t *detail)
 
 void TrialConfirmation_Process(uint32_t now_ms)
 {
-#if defined(PHASE8_DISABLE_TRIAL_CONFIRM)
+#if defined(DISABLE_TRIAL_CONFIRM)
     (void)now_ms;
 #else
     if ((g_trial_active != 0U) &&
         (g_trial_confirmed == 0U) &&
         ((uint32_t)(now_ms - g_trial_start_ms) >=
-         PHASE8_TRIAL_CONFIRM_DELAY_MS))
+         TRIAL_CONFIRM_DELAY_MS))
     {
         uint32_t detail = 0UL;
 

@@ -1,2 +1,2 @@
-# Phase 15 server uses the Python 3 standard library only.
+# release pipeline server uses the Python 3 standard library only.
 # Runtime tools: OpenSSL CLI for manifest-signature verification.

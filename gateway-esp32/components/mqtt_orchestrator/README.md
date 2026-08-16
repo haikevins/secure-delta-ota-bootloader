@@ -1,7 +1,7 @@
-# mqtt_orchestrator — Phase 11
+# mqtt_orchestrator — MQTT orchestration
 
-Phase 11 uses MQTT only for orchestration/status. Firmware bytes remain on the
-Phase-10 HTTPS path.
+MQTT orchestration uses MQTT only for orchestration/status. Firmware bytes remain on the
+HTTPS artifact path.
 
 Topics:
 
@@ -29,13 +29,13 @@ Command payload:
   "target_version": 2,
   "size": 10184,
   "crc32": 2321302940,
-  "url": "https://192.168.1.8:8443/phase11_candidate.bin"
+  "url": "https://192.168.1.8:8443/artifact.sdot"
 }
 ```
 
 The command topic is subscribed at QoS 1. Status is queued at QoS 1; progress
 uses QoS 0. The MQTT event callback only reassembles/parses/enqueues commands.
-HTTPS download and STM32 UART OTA are performed by the Phase-11 gateway worker,
+HTTPS download and STM32 UART OTA are performed by the MQTT orchestration gateway worker,
 not by the MQTT task.
 
 `MQTT_EVENT_DATA` fragmentation is handled with `total_data_len` and

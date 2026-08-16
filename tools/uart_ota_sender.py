@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PC UART client for Secure Delta OTA Phase 5/6/7."""
+"""PC UART client for the Secure Delta OTA protocol."""
 from __future__ import annotations
 
 import argparse
@@ -39,7 +39,7 @@ def require_pyserial():
     except ImportError as exc:
         raise SystemExit(
             "pyserial is required.\n"
-            "Install: python3 -m pip install -r tools/requirements-phase5.txt"
+            "Install: python3 -m pip install -r tools/requirements-UART OTA transport.txt"
         ) from exc
     return serial
 
@@ -333,26 +333,26 @@ def full_ota(link: SerialLink, data: bytes,
     )
 
 
-PHASE13_DELTA_MAGIC = 0x50333144
-PHASE13_DELTA_HEADER_SIZE = 48
-PHASE13_DELTA_PREFIX = struct.Struct("<IHHIIIIIIIII")
-PHASE13_DELTA_CRC = struct.Struct("<I")
+DELTA_ARTIFACT_MAGIC = 0x50333144
+DELTA_ARTIFACT_HEADER_SIZE = 48
+DELTA_ARTIFACT_PREFIX = struct.Struct("<IHHIIIIIIIII")
+DELTA_ARTIFACT_CRC = struct.Struct("<I")
 
 
-def parse_phase13_delta_artifact(data: bytes) -> dict[str, int]:
-    if len(data) < PHASE13_DELTA_HEADER_SIZE:
-        raise ProtocolError("Phase-13 delta artifact is too short")
+def parse_delta_artifact(data: bytes) -> dict[str, int]:
+    if len(data) < DELTA_ARTIFACT_HEADER_SIZE:
+        raise ProtocolError("streaming delta reconstruction delta artifact is too short")
 
-    values = PHASE13_DELTA_PREFIX.unpack_from(data)
-    stored_header_crc = PHASE13_DELTA_CRC.unpack_from(
-        data, PHASE13_DELTA_HEADER_SIZE - 4
+    values = DELTA_ARTIFACT_PREFIX.unpack_from(data)
+    stored_header_crc = DELTA_ARTIFACT_CRC.unpack_from(
+        data, DELTA_ARTIFACT_HEADER_SIZE - 4
     )[0]
 
-    if values[0] != PHASE13_DELTA_MAGIC:
+    if values[0] != DELTA_ARTIFACT_MAGIC:
         raise ProtocolError("not a D13P delta artifact")
-    if values[1] != 1 or values[2] != PHASE13_DELTA_HEADER_SIZE:
+    if values[1] != 1 or values[2] != DELTA_ARTIFACT_HEADER_SIZE:
         raise ProtocolError("unsupported D13P format/header size")
-    if crc32(data[:PHASE13_DELTA_HEADER_SIZE - 4]) != stored_header_crc:
+    if crc32(data[:DELTA_ARTIFACT_HEADER_SIZE - 4]) != stored_header_crc:
         raise ProtocolError("D13P header CRC mismatch")
 
     info = {
@@ -367,9 +367,9 @@ def parse_phase13_delta_artifact(data: bytes) -> dict[str, int]:
         "patch_crc32": values[11],
     }
 
-    if PHASE13_DELTA_HEADER_SIZE + info["patch_size"] != len(data):
+    if DELTA_ARTIFACT_HEADER_SIZE + info["patch_size"] != len(data):
         raise ProtocolError("D13P patch size/total size mismatch")
-    if crc32(data[PHASE13_DELTA_HEADER_SIZE:]) != info["patch_crc32"]:
+    if crc32(data[DELTA_ARTIFACT_HEADER_SIZE:]) != info["patch_crc32"]:
         raise ProtocolError("D13P patch CRC mismatch")
     if info["target_address"] != APPLICATION_ADDRESS:
         raise ProtocolError("D13P target address mismatch")
@@ -380,7 +380,7 @@ def parse_phase13_delta_artifact(data: bytes) -> dict[str, int]:
 def delta_ota(link: SerialLink,
               data: bytes,
               update_id: int) -> None:
-    info = parse_phase13_delta_artifact(data)
+    info = parse_delta_artifact(data)
 
     hello = parse_hello(
         link.request(Packet(command=CMD_QUERY))
@@ -402,7 +402,7 @@ def delta_ota(link: SerialLink,
         target_version=info["target_version"],
         artifact_type=FW_IMAGE_DELTA,
         base_version=info["base_version"],
-        container_header_size=PHASE13_DELTA_HEADER_SIZE,
+        container_header_size=DELTA_ARTIFACT_HEADER_SIZE,
     )
 
     install_packet = Packet(
@@ -435,7 +435,7 @@ def delta_ota(link: SerialLink,
     )
 
     print(
-        f"Phase 13 Delta OTA PASS update_id=0x{update_id:08X} "
+        f"streaming delta reconstruction Delta OTA PASS update_id=0x{update_id:08X} "
         f"base=v{info['base_version']} "
         f"target=v{final.application_version} "
         f"artifact={len(data)} patch={info['patch_size']}"
@@ -443,27 +443,27 @@ def delta_ota(link: SerialLink,
 
 
 
-PHASE14_CONTAINER_MAGIC = 0x544F4453
-PHASE14_CONTAINER_HEADER_SIZE = 140
-PHASE14_FIXED = struct.Struct("<IHHIIIIIIIII32s32sIHHHH")
-PHASE14_EXT = struct.Struct("<IHHIII")
-PHASE14_SIGNATURE_SIZE = 64
+SECURE_CONTAINER_MAGIC = 0x544F4453
+SECURE_CONTAINER_HEADER_SIZE = 140
+SECURE_CONTAINER_FIXED = struct.Struct("<IHHIIIIIIIII32s32sIHHHH")
+SECURE_CONTAINER_EXT = struct.Struct("<IHHIII")
+SECURE_CONTAINER_SIGNATURE_SIZE = 64
 
 
-def parse_phase14_secure_container(data: bytes) -> dict[str, int]:
-    if len(data) < PHASE14_CONTAINER_HEADER_SIZE + PHASE14_SIGNATURE_SIZE:
-        raise ProtocolError("Phase-14 secure container is too short")
+def parse_secure_container(data: bytes) -> dict[str, int]:
+    if len(data) < SECURE_CONTAINER_HEADER_SIZE + SECURE_CONTAINER_SIGNATURE_SIZE:
+        raise ProtocolError("signed secure container secure container is too short")
 
-    fixed = PHASE14_FIXED.unpack_from(data, 0)
-    extension = PHASE14_EXT.unpack_from(data, PHASE14_FIXED.size)
+    fixed = SECURE_CONTAINER_FIXED.unpack_from(data, 0)
+    extension = SECURE_CONTAINER_EXT.unpack_from(data, SECURE_CONTAINER_FIXED.size)
 
-    if fixed[0] != PHASE14_CONTAINER_MAGIC:
+    if fixed[0] != SECURE_CONTAINER_MAGIC:
         raise ProtocolError("not an SDOT secure container")
-    if fixed[1] != 1 or fixed[2] != PHASE14_CONTAINER_HEADER_SIZE:
+    if fixed[1] != 1 or fixed[2] != SECURE_CONTAINER_HEADER_SIZE:
         raise ProtocolError("unsupported SDOT format/header size")
     if extension[0] != 0x31584353 or extension[1] != 1 or extension[2] != 20:
         raise ProtocolError("invalid SDOT SCX1 extension")
-    if fixed[15] != 1 or fixed[16] != 1 or fixed[17] != PHASE14_SIGNATURE_SIZE:
+    if fixed[15] != 1 or fixed[16] != 1 or fixed[17] != SECURE_CONTAINER_SIGNATURE_SIZE:
         raise ProtocolError("unsupported SDOT hash/signature algorithm")
 
     image_type = fixed[5]
@@ -477,14 +477,14 @@ def parse_phase14_secure_container(data: bytes) -> dict[str, int]:
     base_size = extension[4]
     target_crc32 = extension[5]
 
-    total = PHASE14_CONTAINER_HEADER_SIZE + payload_size + PHASE14_SIGNATURE_SIZE
+    total = SECURE_CONTAINER_HEADER_SIZE + payload_size + SECURE_CONTAINER_SIGNATURE_SIZE
     if total != len(data):
         raise ProtocolError("SDOT total length mismatch")
     if target_address != APPLICATION_ADDRESS:
         raise ProtocolError("SDOT target address mismatch")
     if crc32(
-        data[PHASE14_CONTAINER_HEADER_SIZE:
-             PHASE14_CONTAINER_HEADER_SIZE + payload_size]
+        data[SECURE_CONTAINER_HEADER_SIZE:
+             SECURE_CONTAINER_HEADER_SIZE + payload_size]
     ) != payload_crc32:
         raise ProtocolError("SDOT payload CRC mismatch")
     if image_type not in (FW_IMAGE_FULL, FW_IMAGE_DELTA):
@@ -509,7 +509,7 @@ def parse_phase14_secure_container(data: bytes) -> dict[str, int]:
 def secure_ota(link: SerialLink,
                data: bytes,
                update_id: int) -> None:
-    info = parse_phase14_secure_container(data)
+    info = parse_secure_container(data)
 
     hello = parse_hello(
         link.request(Packet(command=CMD_QUERY))
@@ -542,7 +542,7 @@ def secure_ota(link: SerialLink,
         target_version=info["target_version"],
         artifact_type=info["image_type"],
         base_version=info["base_version"],
-        container_header_size=PHASE14_CONTAINER_HEADER_SIZE,
+        container_header_size=SECURE_CONTAINER_HEADER_SIZE,
     )
 
     install_packet = Packet(
@@ -575,7 +575,7 @@ def secure_ota(link: SerialLink,
     )
 
     print(
-        f"Phase 14 Secure OTA PASS update_id=0x{update_id:08X} "
+        f"signed secure container Secure OTA PASS update_id=0x{update_id:08X} "
         f"type={'delta' if info['image_type'] == FW_IMAGE_DELTA else 'full'} "
         f"target=v{final.application_version} "
         f"container={len(data)} payload={info['payload_size']} "
@@ -658,7 +658,7 @@ def self_test(link: SerialLink, size: int, update_id: int) -> None:
         raise ProtocolError("QUERY final state/progress mismatch")
 
     print(
-        f"Phase 5 UART protocol hardware self-test: PASS "
+        f"UART protocol hardware self-test: PASS "
         f"(size={size}, update_id=0x{update_id:08X})"
     )
 
