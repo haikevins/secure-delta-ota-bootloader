@@ -1,5 +1,15 @@
 # 5-Minute Portfolio Demo
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← One-Page Summary](portfolio-one-page.md) · [Evidence Map →](portfolio-evidence.md)
+
+## Table of contents
+
+- [0:00–0:45 — Architecture](#000-045-architecture)
+- [0:45–1:30 — Memory and protocol](#045-130-memory-and-protocol)
+- [1:30–2:15 — Secure release](#130-215-secure-release)
+- [2:15–3:10 — Delta and recovery](#215-310-delta-and-recovery)
+- [3:10–4:10 — Hardware evidence](#310-410-hardware-evidence)
+- [4:10–5:00 — Benchmark and closure](#410-500-benchmark-and-closure)
 ## 0:00–0:45 — Architecture
 
 Show `README.md` and explain the split trust model: ESP32 handles network transport; STM32 bootloader remains authoritative for signature verification, version policy, patching, install and rollback.
@@ -55,3 +65,11 @@ make benchmark TOOLCHAIN=gcc
 ```
 
 Show `dist/benchmark/benchmark.md` and the measured flash/delta figures. End with the key claim: a secure delta OTA system that was validated not only on the happy path but under deterministic power-loss, transport and signature-failure scenarios.
+
+## References
+
+- [`README.md`](../README.md)
+- [`hil-results.md`](hil-results.md)
+- [`benchmark-portfolio.md`](benchmark-portfolio.md)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← One-Page Summary](portfolio-one-page.md) · [Evidence Map →](portfolio-evidence.md)

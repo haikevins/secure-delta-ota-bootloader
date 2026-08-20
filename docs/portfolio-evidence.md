@@ -1,5 +1,12 @@
 # Portfolio Claim / Evidence Map
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Demo Guide](portfolio-demo.md)
+
+## Table of contents
+
+- [Strongest hardware evidence](#strongest-hardware-evidence)
+- [Benchmark evidence](#benchmark-evidence)
+- [Recommended portfolio presentation](#recommended-portfolio-presentation)
 This map separates implementation claims from hardware-verified claims and shows how to reproduce each one.
 
 | Claim | Evidence | Reproduce |
@@ -92,3 +99,11 @@ Then show:
 - `docs/results-report.md`;
 - `PROJECT_REPORT.md`;
 - the hardware wiring/board.
+
+## References
+
+- [`README.md`](../README.md)
+- [`VALIDATION.md`](../VALIDATION.md)
+- [`hil-results.md`](hil-results.md)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Demo Guide](portfolio-demo.md)

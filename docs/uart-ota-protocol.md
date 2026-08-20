@@ -1,7 +1,26 @@
 # Custom UART OTA Protocol Version 1
 
-Status: **Protocol v1 implemented with COBS framing, persistent resume and secure install handoff**
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Memory Map](memory-map.md) · [Firmware Container →](firmware-container.md)
 
+> **Status:** **Protocol v1 implemented with COBS framing, persistent resume and secure install handoff**
+
+## Table of contents
+
+- [1. Physical UART configuration](#1-physical-uart-configuration)
+- [2. Framing](#2-framing)
+- [3. Byte order and packing](#3-byte-order-and-packing)
+- [4. Common packet format](#4-common-packet-format)
+- [5. Commands](#5-commands)
+- [6. Status codes](#6-status-codes)
+- [7. HELLO and QUERY payloads](#7-hello-and-query-payloads)
+- [8. START payload](#8-start-payload)
+- [9. DATA rules](#9-data-rules)
+- [10. ACK/NACK payload](#10-acknack-payload)
+- [11. FINISH behavior](#11-finish-behavior)
+- [12. RESUME behavior](#12-resume-behavior)
+- [13. Retry policy](#13-retry-policy)
+- [14. Protocol state constraints](#14-protocol-state-constraints)
+- [15. Security note](#15-security-note)
 Receive recovery persists progress at complete 4 KiB W25Q sector boundaries.
 The PC sender uses 256-byte DATA chunks, so these checkpoints are also packet
 boundaries. After reset, QUERY/RESUME returns the newest valid persisted
@@ -235,3 +254,11 @@ Gateway sends matching `update_id` and expected artifact identity. Node responds
 ## 15. Security note
 
 UART packet CRC protects transfer integrity, not authenticity. Secure authenticity is provided later by bootloader signature verification of the complete container.
+
+## References
+
+- [`ota_protocol.h`](../shared/include/ota_protocol.h)
+- [`ota_receiver.c`](../node-stm32f103/application/src/ota_receiver.c)
+- [`uart_ota_protocol.h`](../gateway-esp32/components/uart_ota/include/uart_ota_protocol.h)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Memory Map](memory-map.md) · [Firmware Container →](firmware-container.md)

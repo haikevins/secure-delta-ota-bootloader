@@ -1,7 +1,15 @@
 # Threat Model
 
-Status: implemented security/recovery baseline with physical negative testing
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← External SPI Flash](external-spi-flash.md) · [Release Process →](release-process.md)
 
+> **Status:** implemented security/recovery baseline with physical negative testing
+
+## Table of contents
+
+- [Assets](#assets)
+- [Trust boundaries](#trust-boundaries)
+- [Addressed threats](#addressed-threats)
+- [Out of scope](#out-of-scope)
 ## Assets
 
 - bootloader code and embedded public key;
@@ -40,3 +48,11 @@ Status: implemented security/recovery baseline with physical negative testing
 - protection against a compromised signing environment;
 - hardware secure element key storage;
 - network denial of service.
+
+## References
+
+- [`architecture.md`](architecture.md)
+- [`firmware-container.md`](firmware-container.md)
+- [`secure_container.c`](../node-stm32f103/bootloader/src/secure_container.c)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← External SPI Flash](external-spi-flash.md) · [Release Process →](release-process.md)

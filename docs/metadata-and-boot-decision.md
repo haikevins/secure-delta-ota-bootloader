@@ -1,5 +1,16 @@
 # Persistent Metadata and Boot Decision
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Boot State Machine](boot-state-machine.md) · [Boot Jump →](boot-jump.md)
+
+## Table of contents
+
+- [1. Purpose](#1-purpose)
+- [2. Internal Flash revision](#2-internal-flash-revision)
+- [3. Record commit protocol](#3-record-commit-protocol)
+- [4. Generation ordering](#4-generation-ordering)
+- [5. First boot](#5-first-boot)
+- [6. Boot decision ownership](#6-boot-decision-ownership)
+- [7. LED diagnostics](#7-led-diagnostics)
 ## 1. Purpose
 
 persistent metadata adds the first persistent boot state. It does **not** install OTA images.
@@ -53,6 +64,23 @@ new generation becomes selected on next load
 Power loss during erase/program leaves the previous selected page unchanged.
 A partial target record has an invalid CRC and is ignored.
 
+### A/B commit state
+
+```mermaid
+stateDiagram-v2
+    [*] --> Load
+    Load --> SlotA: A newest valid
+    Load --> SlotB: B newest valid
+    Load --> Defaults: neither valid
+    SlotA --> ProgramB: next commit
+    SlotB --> ProgramA: next commit
+    Defaults --> ProgramA: first commit
+    ProgramA --> VerifyA
+    ProgramB --> VerifyB
+    VerifyA --> SlotA: CRC + byte compare valid
+    VerifyB --> SlotB: CRC + byte compare valid
+```
+
 ## 4. Generation ordering
 
 Generation zero is invalid. Normal updates increment the selected generation.
@@ -88,3 +116,11 @@ states remain in bootloader recovery with a nine-pulse PC13 pattern.
 - 8 pulses: metadata storage/load fatal error;
 - 9 pulses: a valid metadata state requires a recovery action;
 - five fast pulses followed by application heartbeat: active image booted.
+
+## References
+
+- [`boot_metadata.h`](../shared/include/boot_metadata.h)
+- [`metadata_storage.c`](../node-stm32f103/bootloader/storage/metadata_storage.c)
+- [`boot_decision.c`](../node-stm32f103/bootloader/src/boot_decision.c)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Boot State Machine](boot-state-machine.md) · [Boot Jump →](boot-jump.md)

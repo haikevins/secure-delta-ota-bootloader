@@ -1,7 +1,15 @@
 # Verification and Test Plan
 
-Status: deterministic power-loss recovery coverage included
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Make Commands](make-command-reference.md) · [HIL Results →](hil-results.md)
 
+> **Status:** deterministic power-loss recovery coverage included
+
+## Table of contents
+
+- [Required test categories](#required-test-categories)
+- [Final reliability target](#final-reliability-target)
+- [boot metadata hardware acceptance](#boot-metadata-hardware-acceptance)
+- [power-loss recovery power-loss acceptance](#power-loss-recovery-power-loss-acceptance)
 ## Required test categories
 
 ### Build and memory
@@ -106,3 +114,11 @@ Hardware fault injection:
 - prove application v2 boots;
 - prove final metadata is IDLE with active_version=2 and copy_offset=0;
 - restore the normal bootloader without overwriting application v2.
+
+## References
+
+- [`tests`](../tests/)
+- [`project_check.py`](../scripts/project_check.py)
+- [`fault_matrix.json`](../tests/fault/fault_matrix.json)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Make Commands](make-command-reference.md) · [HIL Results →](hil-results.md)

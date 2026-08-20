@@ -1,7 +1,19 @@
 # System Architecture Specification
 
-Status: **Integrated architecture implemented and hardware-validated**
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [Memory Map →](memory-map.md)
 
+> **Status:** **Integrated architecture implemented and hardware-validated**
+
+## Table of contents
+
+- [1. Objective](#1-objective)
+- [2. System boundary](#2-system-boundary)
+- [3. Responsibilities](#3-responsibilities)
+- [4. Architectural rules](#4-architectural-rules)
+- [5. Initial hardware assignments](#5-initial-hardware-assignments)
+- [6. Update selection policy](#6-update-selection-policy)
+- [7. Architecture acceptance](#7-architecture-acceptance)
+- [Signed secure-container trust boundary](#signed-secure-container-trust-boundary)
 ## 1. Objective
 
 Build a secure and recoverable firmware update system for STM32F103C8T6 that supports both full-image OTA and delta OTA while keeping networking and certificate handling outside the constrained STM32 node.
@@ -38,6 +50,20 @@ STM32F103 Bootloader
   | backs up current application
   | installs and verifies target image
   | performs trial boot and rollback
+```
+
+### Architecture flow
+
+```mermaid
+flowchart LR
+    CI["Developer / CI"] --> SRV["Release server"]
+    SRV -->|"MQTTS orchestration"| ESP["ESP32"]
+    SRV -->|"HTTPS artifact"| ESP
+    ESP -->|"UART OTA"| APP["STM32 application"]
+    APP -->|"stage + checkpoint"| EXT["W25Q"]
+    BL["STM32 bootloader"] -->|"verify / reconstruct / backup"| EXT
+    BL -->|"install / rollback"| IF["Internal Flash"]
+    APP -->|"reset / confirm"| BL
 ```
 
 ## 3. Responsibilities
@@ -110,7 +136,7 @@ Stores:
 7. Installation begins only after the incoming artifact and reconstructed target image have been validated.
 8. Backup is retained until the trial application is confirmed.
 9. Metadata updates use two copies, CRC32 and monotonic generation number.
-10. initial scaffold excludes bootloader self-update, AES encryption, LoRa, CAN/UDS and multi-node scheduling.
+10. Current project scope excludes bootloader self-update, AES encryption, LoRa, CAN/UDS and multi-node scheduling.
 
 ## 5. Initial hardware assignments
 
@@ -147,7 +173,7 @@ Otherwise, use the full container.
 - Deterministic physical fault testing records 9/9 PASS.
 
 
-## signed secure container trust-boundary update
+## Signed secure-container trust boundary
 
 The bootloader now enforces firmware authenticity using signed SDOT containers.
 ESP32, HTTPS, MQTT and UART remain transport/orchestration layers and do not
@@ -164,3 +190,11 @@ the exact base/target image bytes, and ECDSA P-256 authenticates the signed
 container.
 
 Unsigned legacy installation is disabled by default.
+
+## References
+
+- [`README.md`](../node-stm32f103/README.md)
+- [`README.md`](../gateway-esp32/README.md)
+- [`README.md`](../server/README.md)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [Memory Map →](memory-map.md)

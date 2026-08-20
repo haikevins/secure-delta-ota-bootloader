@@ -13,6 +13,7 @@ benchmarks/README.md
 benchmarks/reference.csv
 benchmarks/reference.json
 benchmarks/reference.md
+docs/README.md
 docs/architecture.md
 docs/benchmark-portfolio.md
 docs/boot-jump.md
@@ -37,6 +38,7 @@ docs/threat-model.md
 docs/toolchain-selection.md
 docs/uart-ota-protocol.md
 gateway-esp32/CMakeLists.txt
+gateway-esp32/README.md
 gateway-esp32/components/artifact_cache/CMakeLists.txt
 gateway-esp32/components/artifact_cache/README.md
 gateway-esp32/components/artifact_cache/artifact_cache.c
@@ -90,6 +92,7 @@ gateway-esp32/main/test_ca.pem
 gateway-esp32/partitions.csv
 gateway-esp32/sdkconfig.defaults
 mk/stm32f103.mk
+node-stm32f103/README.md
 node-stm32f103/application/Makefile
 node-stm32f103/application/drivers/gpio.c
 node-stm32f103/application/drivers/timer.c

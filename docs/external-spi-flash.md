@@ -1,7 +1,17 @@
 # External SPI Flash
 
-Status: **implemented; hardware validation script provided**
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Boot Jump](boot-jump.md) · [Threat Model →](threat-model.md)
 
+> **Status:** **implemented; hardware validation script provided**
+
+## Table of contents
+
+- [Target and wiring](#target-and-wiring)
+- [Commands used](#commands-used)
+- [Safety behavior](#safety-behavior)
+- [Partition map](#partition-map)
+- [Repository validation](#repository-validation)
+- [Hardware validation](#hardware-validation)
 ## Target and wiring
 
 The logical layout targets W25Q32 (4 MiB, JEDEC `EF 40 16`). W25Q64 (8 MiB, JEDEC `EF 40 17`) is also accepted as compatible development hardware; the OTA layout still uses only the first 4 MiB.
@@ -90,8 +100,9 @@ SPI Flash hardware test: PASS
 Restore the normal firmware afterwards with `make flash-combined`.
 
 
-## Primary references
-
+## References
 - Winbond W25Q32JV and W25Q64JV data sheet/product documentation.
 - ST RM0008 STM32F10x reference manual.
 - STSW-STM32054 STM32F10x Standard Peripheral Library.
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Boot Jump](boot-jump.md) · [Threat Model →](threat-model.md)

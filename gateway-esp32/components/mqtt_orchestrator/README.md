@@ -1,9 +1,10 @@
-# mqtt_orchestrator — MQTT orchestration
+# `mqtt_orchestrator`
 
-MQTT orchestration uses MQTT only for orchestration/status. Firmware bytes remain on the
-HTTPS artifact path.
+> **Scope:** MQTTS command ingestion plus status/progress publication for one serialized STM32 update at a time; firmware bytes remain on HTTPS.
 
-Topics:
+[← HTTPS Download](../https_download/README.md) · [Gateway](../../README.md) · [UART OTA →](../uart_ota/README.md)
+
+## Topics
 
 ```text
 <base>/<device_id>/command
@@ -11,15 +12,11 @@ Topics:
 <base>/<device_id>/progress
 ```
 
-Default:
+Default topic root/device is `sdota/bluepill-001`.
 
-```text
-sdota/bluepill-001/command
-sdota/bluepill-001/status
-sdota/bluepill-001/progress
-```
+## Command contract
 
-Command payload:
+Schema version `1` contains a non-zero `update_id`, positive target version, expected artifact size, artifact CRC32, and HTTPS URL. Maximum URL length is `255` bytes; maximum reconstructed MQTT data payload is `767` bytes.
 
 ```json
 {
@@ -27,18 +24,30 @@ Command payload:
   "cmd": "update",
   "update_id": 2953510913,
   "target_version": 2,
-  "size": 10184,
+  "size": 1174,
   "crc32": 2321302940,
-  "url": "https://192.168.1.8:8443/artifact.sdot"
+  "url": "https://firmware.example/releases/fw-v2/application-v1-to-v2.delta.sdot"
 }
 ```
 
-The command topic is subscribed at QoS 1. Status is queued at QoS 1; progress
-uses QoS 0. The MQTT event callback only reassembles/parses/enqueues commands.
-HTTPS download and STM32 UART OTA are performed by the MQTT orchestration gateway worker,
-not by the MQTT task.
+## Concurrency rule
 
-`MQTT_EVENT_DATA` fragmentation is handled with `total_data_len` and
-`current_data_offset`, bounded to 767 bytes.
+The ESP-MQTT callback performs only bounded orchestration work:
 
-Production requires `mqtts://` and broker certificate verification.
+```text
+MQTT_EVENT_DATA
+   -> fragment reassembly
+   -> schema validation
+   -> enqueue one command
+   -> return
+```
+
+HTTPS download and UART OTA run in the dedicated gateway worker, not inside the MQTT event callback. The command queue length is `1`, so the current implementation deliberately serializes updates.
+
+Status is QoS 1. Terminal status may wait for PUBACK before teardown. Progress is published separately and does not replace the persistent STM32 state machine.
+
+## Implementation references
+
+- [`include/mqtt_orchestrator.h`](include/mqtt_orchestrator.h)
+- [`include/mqtt_orchestration_contract.h`](include/mqtt_orchestration_contract.h)
+- [`mqtt_orchestrator.c`](mqtt_orchestrator.c)

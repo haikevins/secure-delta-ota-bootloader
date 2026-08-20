@@ -1,7 +1,14 @@
 # Firmware Release Process
 
-Status: signed immutable release pipeline implemented and validated.
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Threat Model](threat-model.md) · [Toolchain Selection →](toolchain-selection.md)
 
+> **Status:** signed immutable release pipeline implemented and validated.
+
+## Table of contents
+
+- [Release directory](#release-directory)
+- [Private-key policy](#private-key-policy)
+- [Local release](#local-release)
 ```text
 Build target application.bin
         |
@@ -31,6 +38,22 @@ signed full SDOT                    exact previous release .bin
                                            |
                                            v
                                     ESP32 -> STM32
+```
+
+### Release transaction
+
+```mermaid
+flowchart TD
+    T["Target application.bin"] --> F["Signed full SDOT"]
+    B["Exact previous application.bin"] --> D["JojoDiff delta"]
+    T --> D
+    D --> DS["Signed delta SDOT"]
+    F --> M["manifest.json"]
+    DS --> M
+    M --> MS["Detached ECDSA manifest signature"]
+    MS --> V["Verify immutable release directory"]
+    V --> H["HTTPS publication"]
+    V --> Q["MQTTS command publication"]
 ```
 
 ## Release directory
@@ -78,3 +101,11 @@ python3 tools/release.py \
 ```
 
 An existing release directory is never overwritten.
+
+## References
+
+- [`release.py`](../tools/release.py)
+- [`manifest_service.py`](../server/app/services/manifest_service.py)
+- [`firmware-container.md`](firmware-container.md)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Threat Model](threat-model.md) · [Toolchain Selection →](toolchain-selection.md)

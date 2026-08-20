@@ -1,7 +1,26 @@
 # Secure Firmware Container Specification Version 1
 
-Status: **Signed SDOT v1 implemented and enforced by the STM32 bootloader**
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← UART OTA Protocol](uart-ota-protocol.md) · [Boot State Machine →](boot-state-machine.md)
 
+> **Status:** **Signed SDOT v1 implemented and enforced by the STM32 bootloader**
+
+## Table of contents
+
+- [1. Goals](#1-goals)
+- [2. Binary layout](#2-binary-layout)
+- [3. Header fields](#3-header-fields)
+- [4. Fixed constants](#4-fixed-constants)
+- [5. Version encoding](#5-version-encoding)
+- [6. Full-image container rules](#6-full-image-container-rules)
+- [7. Delta container rules](#7-delta-container-rules)
+- [8. Signed bytes](#8-signed-bytes)
+- [9. Validation order](#9-validation-order)
+- [10. Product identity](#10-product-identity)
+- [11. Unsupported initial scaffold features](#11-unsupported-initial-scaffold-features)
+- [full-image OTA compatibility note](#full-image-ota-compatibility-note)
+- [delta generation compatibility note](#delta-generation-compatibility-note)
+- [streaming delta reconstruction functional-envelope note](#streaming-delta-reconstruction-functional-envelope-note)
+- [signed secure container implementation note](#signed-secure-container-implementation-note)
 ## 1. Goals
 
 The same outer container format carries either:
@@ -237,3 +256,11 @@ The private signing key remains host-side. The STM32 bootloader contains only a
 public P-256 trust anchor and key ID.
 
 Key custody, release authorization and server publication are handled by the release pipeline.
+
+## References
+
+- [`firmware_container.h`](../shared/include/firmware_container.h)
+- [`secure_container.c`](../node-stm32f103/bootloader/src/secure_container.c)
+- [`secure_container.py`](../tools/secure_container.py)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← UART OTA Protocol](uart-ota-protocol.md) · [Boot State Machine →](boot-state-machine.md)
