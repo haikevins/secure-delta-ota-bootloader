@@ -25,17 +25,16 @@ The ESP32 definitions intentionally mirror the STM32 protocol values.
 
 Before transfer, the gateway queries the STM32 and selects one action from the target's persisted state:
 
-```mermaid
-flowchart TD
-    Q["HELLO / QUERY"] --> C{"already target version?"}
-    C -->|"yes"| A["ALREADY_TARGET"]
-    C -->|"no"| U{"same update_id active?"}
-    U -->|"receiving"| R["RESUME"]
-    U -->|"artifact ready"| I["INSTALL_READY"]
-    U -->|"bootloader working"| W["WAIT_TARGET"]
-    U -->|"foreign active update"| F["ABORT_FOREIGN"]
-    U -->|"idle"| N["START_NEW"]
-```
+`UartOta_SelectPlan()` evaluates the target state in priority order:
+
+| Priority | Observed target state | Selected plan |
+|---:|---|---|
+| 1 | already running the requested target version | `ALREADY_TARGET` |
+| 2 | same `update_id`, receive still in progress | `RESUME` |
+| 3 | same `update_id`, artifact already complete | `INSTALL_READY` |
+| 4 | same `update_id`, bootloader installation/trial still active | `WAIT_TARGET` |
+| 5 | a different update is active | `ABORT_FOREIGN` |
+| 6 | no active update state blocks a new transfer | `START_NEW` |
 
 The client handles START/DATA/FINISH/INSTALL, ACK/NACK retries, persistent receive resume, reset/reconnect windows, and final confirmed/rollback observation.
 

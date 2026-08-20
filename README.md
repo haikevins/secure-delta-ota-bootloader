@@ -42,20 +42,33 @@ The repository intentionally ships with an **unprovisioned firmware trust anchor
 
 ## System architecture
 
+The system has two linked paths: release/transport and on-device installation/recovery.
+
+**Release and transport path**
+
 ```mermaid
-flowchart LR
+flowchart TB
     DEV["Developer / CI"] --> REL["Signed release tooling"]
     REL --> SRV["Release server"]
-    SRV -->|"MQTTS command / status"| GW["ESP32 gateway"]
-    SRV -->|"HTTPS SDOT artifact"| GW
-    GW -->|"COBS + CRC32 UART OTA"| APP["STM32 application"]
-    APP -->|"Stage artifact + checkpoint"| EXT["W25Q external SPI NOR"]
-    APP -->|"Reset after INSTALL request"| BL["STM32 bootloader"]
-    BL -->|"Read / reconstruct / backup"| EXT
-    BL -->|"Install verified image"| IFLASH["STM32 internal Flash"]
-    BL -->|"Trial jump"| APP
-    APP -->|"Persist CONFIRMED + reset"| BL
-    BL -->|"Finalize confirmed version"| IFLASH
+    SRV --> CMD["MQTTS command / status"]
+    SRV --> ART["HTTPS SDOT artifact"]
+    CMD --> GW["ESP32 gateway"]
+    ART --> GW
+    GW --> UART["COBS + CRC32 UART OTA"]
+    UART --> APP["STM32 application"]
+    APP --> EXT["W25Q staging + checkpoint"]
+```
+
+**Installation and recovery path**
+
+```mermaid
+flowchart TB
+    APP["STM32 application"] -->|"INSTALL request + reset"| BL["STM32 bootloader"]
+    BL --> WORK["Verify / reconstruct / backup in W25Q"]
+    WORK --> INSTALL["Install + verify internal Flash"]
+    INSTALL --> TRIAL["Trial application boot"]
+    TRIAL --> CONFIRM["Persist CONFIRMED + reset"]
+    CONFIRM --> FINAL["Bootloader finalizes active version"]
 ```
 
 The responsibilities are deliberately split:
@@ -107,28 +120,51 @@ The private signing key is required to live outside the repository. `tools/relea
 
 ## End-to-end update flow
 
+The update lifecycle crosses three distinct ownership boundaries.
+
+**Release publication and gateway acquisition**
+
 ```mermaid
 sequenceDiagram
     participant CI as Release tooling
     participant S as Release server
     participant G as ESP32 gateway
-    participant A as STM32 application
-    participant F as W25Q SPI NOR
-    participant B as STM32 bootloader
 
     CI->>CI: Validate application vector + size
     CI->>CI: Build full SDOT and optional JojoDiff delta SDOT
     CI->>CI: Sign SDOT + manifest with ECDSA P-256
     CI->>S: Publish immutable release directory
     S->>G: MQTTS update command
+    G->>S: HTTPS GET selected SDOT
+    S-->>G: Bounded SDOT stream
+    G->>G: Persist stm32_cache + complete CRC readback
+```
+
+**UART staging on STM32**
+
+```mermaid
+sequenceDiagram
+    participant G as ESP32 gateway
+    participant A as STM32 application
+    participant F as W25Q SPI NOR
+
     G->>A: QUERY / HELLO
     A-->>G: Version, state, capability, resume offset
-    G->>S: HTTPS GET selected SDOT
-    G->>G: Stream to persistent stm32_cache + CRC readback
-    G->>A: START / DATA / FINISH / INSTALL
-    A->>F: Persist incoming bytes + 4 KiB receive checkpoints
+    G->>A: START / DATA / FINISH
+    A->>F: Persist bytes + 4 KiB receive checkpoints
     A->>A: Validate complete artifact CRC
-    A->>B: Reset after persistent install request
+    G->>A: INSTALL
+    A->>A: Persist install request + reset
+```
+
+**Bootloader verification, installation, and trial closure**
+
+```mermaid
+sequenceDiagram
+    participant B as STM32 bootloader
+    participant F as W25Q SPI NOR
+    participant A as STM32 application
+
     B->>F: Verify SDOT signature and policy
     alt Delta SDOT
         B->>B: Verify active base version + SHA-256
@@ -152,27 +188,46 @@ The gateway selects an exact-base delta only when it exists and is appropriate; 
 
 Persistent boot metadata defines the recovery point. The implemented states are the values in `shared/include/boot_metadata.h`.
 
+The persistent state machine has three stages: artifact reception, candidate preparation/installation, and trial closure.
+
+**Artifact reception and container acceptance**
+
 ```mermaid
 stateDiagram-v2
+    direction TB
     [*] --> IDLE
     IDLE --> RECEIVING: START
     RECEIVING --> RECEIVING: DATA / resume
-    RECEIVING --> ARTIFACT_READY: FINISH + artifact CRC valid
+    RECEIVING --> ARTIFACT_READY: FINISH + CRC valid
+    RECEIVING --> FAILED: unrecoverable receive/storage error
     ARTIFACT_READY --> VERIFYING_CONTAINER: reset / INSTALL
+    VERIFYING_CONTAINER --> IDLE: artifact rejected
+```
+
+**Candidate reconstruction and installation**
+
+```mermaid
+stateDiagram-v2
+    direction TB
     VERIFYING_CONTAINER --> VERIFYING_BASE: delta
     VERIFYING_CONTAINER --> PATCHING: full
     VERIFYING_BASE --> PATCHING: base version + SHA-256 valid
-    PATCHING --> IMAGE_READY: reconstructed target verified
+    PATCHING --> IMAGE_READY: target verified
     IMAGE_READY --> BACKING_UP
     BACKING_UP --> INSTALLING: backup verified
     INSTALLING --> VERIFYING_INSTALL
-    VERIFYING_INSTALL --> TRIAL_BOOT: installed image verified
+    VERIFYING_INSTALL --> TRIAL_BOOT: install verified
+```
+
+**Trial confirmation or rollback**
+
+```mermaid
+stateDiagram-v2
+    direction TB
     TRIAL_BOOT --> CONFIRMED: application confirms health
-    CONFIRMED --> IDLE: bootloader finalizes version
+    CONFIRMED --> IDLE: finalize version
     TRIAL_BOOT --> ROLLBACK: attempt limit / invalid trial
     ROLLBACK --> IDLE: verified backup restored
-    RECEIVING --> FAILED: unrecoverable receive/storage error
-    VERIFYING_CONTAINER --> IDLE: rejected artifact preserves active app
 ```
 
 Key recovery invariants:

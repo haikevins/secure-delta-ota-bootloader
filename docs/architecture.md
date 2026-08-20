@@ -54,16 +54,29 @@ STM32F103 Bootloader
 
 ### Architecture flow
 
+The architecture separates release/transport responsibilities from reset-time installation authority.
+
+**Release and transport path**
+
 ```mermaid
-flowchart LR
+flowchart TB
     CI["Developer / CI"] --> SRV["Release server"]
-    SRV -->|"MQTTS orchestration"| ESP["ESP32"]
-    SRV -->|"HTTPS artifact"| ESP
-    ESP -->|"UART OTA"| APP["STM32 application"]
-    APP -->|"stage + checkpoint"| EXT["W25Q"]
-    BL["STM32 bootloader"] -->|"verify / reconstruct / backup"| EXT
-    BL -->|"install / rollback"| IF["Internal Flash"]
-    APP -->|"reset / confirm"| BL
+    SRV --> CMD["MQTTS orchestration"]
+    SRV --> ART["HTTPS artifact"]
+    CMD --> ESP["ESP32 gateway"]
+    ART --> ESP
+    ESP --> UART["UART OTA"]
+    UART --> APP["STM32 application"]
+    APP --> EXT["W25Q stage + checkpoint"]
+```
+
+**Reset-time installation path**
+
+```mermaid
+flowchart TB
+    APP["STM32 application"] -->|"reset / install request / confirm"| BL["STM32 bootloader"]
+    BL --> EXT["W25Q verify / reconstruct / backup"]
+    BL --> IF["Internal Flash install / rollback"]
 ```
 
 ## 3. Responsibilities

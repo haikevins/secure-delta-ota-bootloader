@@ -21,28 +21,49 @@
 
 `app_main()` creates a dedicated gateway worker task with the configured stack size (default `16384` bytes). The worker calls `GatewayManager_Run()`.
 
+The gateway worker performs connectivity/orchestration, artifact acquisition, and STM32 delivery as separate runtime stages.
+
+**Connectivity and command acceptance**
+
 ```mermaid
 sequenceDiagram
     participant G as Gateway worker
     participant W as Wi-Fi / SNTP
     participant M as MQTTS broker
-    participant H as HTTPS server
-    participant C as stm32_cache
-    participant S as STM32 UART
 
     G->>W: Connect Wi-Fi + establish sane time
-    G->>M: Connect, subscribe command topic
+    G->>M: Connect + subscribe command topic
     M-->>G: QoS1 update command
-    G->>S: QUERY current version/state/capabilities
-    S-->>G: HELLO info
-    G->>M: retained accepted status
+    G->>M: Retained accepted status
+```
+
+**HTTPS acquisition into persistent cache**
+
+```mermaid
+sequenceDiagram
+    participant G as Gateway worker
+    participant H as HTTPS server
+    participant C as stm32_cache
+
     G->>H: HTTPS GET signed SDOT
     H-->>G: Content-Length bounded stream
-    G->>C: transactional sequential write
-    G->>C: complete readback CRC
-    G->>S: transfer / resume / install
-    S-->>G: progress + final target state
-    G->>M: progress + retained confirmed/failed status
+    G->>C: Transactional sequential write
+    G->>C: Complete readback CRC
+```
+
+**STM32 transfer and status publication**
+
+```mermaid
+sequenceDiagram
+    participant G as Gateway worker
+    participant S as STM32 UART
+    participant M as MQTTS broker
+
+    G->>S: QUERY current version/state/capabilities
+    S-->>G: HELLO info
+    G->>S: Transfer / resume / install
+    S-->>G: Progress + final target state
+    G->>M: Progress + retained confirmed/failed status
 ```
 
 The gateway progress callbacks publish coarse progress (roughly each additional 10% or completion) for `https` and `uart` stages.
