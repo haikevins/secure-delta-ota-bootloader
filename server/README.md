@@ -83,13 +83,13 @@ python3 server/app/main.py publish \
 ## Release verification
 
 ```mermaid
-flowchart TD
+flowchart TB
     D["Release directory"] --> M["Load manifest.json"]
-    M --> K["Parse signing-public.pem"]
-    K --> P["Check SPKI SHA-256 against manifest + external pin"]
-    P --> S["Verify detached manifest ECDSA signature"]
-    S --> A["Verify every artifact size + CRC32 + SHA-256"]
-    A --> C["Parse SDOT and cross-check manifest metadata"]
+    M --> K["Parse signing public key"]
+    K --> P["Check SPKI pin"]
+    P --> S["Verify manifest signature"]
+    S --> A["Verify size + CRC + SHA"]
+    A --> C["Cross-check SDOT metadata"]
     C --> V["Verified release"]
 ```
 

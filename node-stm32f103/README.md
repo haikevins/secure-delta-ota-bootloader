@@ -55,8 +55,8 @@ The receive path supports full, delta, and signed SDOT artifacts, but the secure
 
 ```mermaid
 flowchart TB
-    R["Reset"] --> M["Load newest valid metadata generation"]
-    M --> V["Validate current application vector"]
+    R["Reset"] --> M["Load newest valid metadata"]
+    M --> V["Validate application vector"]
     V --> D["BootDecision_Evaluate"]
 ```
 
@@ -99,27 +99,36 @@ The W25Q driver uses SPI1 on PA5/PA6/PA7 with PB0 as active-low chip select and 
 
 The reset path first dispatches normal boot, persisted update work, or a verified trial image.
 
-```mermaid
-stateDiagram-v2
-    direction TB
-    [*] --> Bootloader
-    Bootloader --> ActiveApp: IDLE + valid vector
-    Bootloader --> UpdateWork: persisted update state
-    UpdateWork --> Bootloader: checkpoint + reset
-    Bootloader --> TrialApp: candidate installed
+```text
+Bootloader decision
+├── IDLE + valid vector      -> Active application
+├── persisted update state  -> Resume update work
+└── candidate installed     -> Trial application
 ```
 
-Trial execution then closes through confirmation or rollback:
+Update work checkpoints progress and returns through reset, so the bootloader re-evaluates persisted metadata after every resumable boundary.
 
-```mermaid
-stateDiagram-v2
-    direction TB
-    TrialApp --> CONFIRMED: health confirmed
-    CONFIRMED --> Bootloader: persist + reset
-    TrialApp --> Bootloader: watchdog / unconfirmed reset
-    Bootloader --> ROLLBACK: attempt limit
-    ROLLBACK --> Bootloader: backup restored
-    Bootloader --> ActiveApp: rollback finalized
+Trial execution then closes through one of two paths.
+
+**Confirmed trial**
+
+```text
+Trial application
+    -> persist CONFIRMED
+    -> reset
+    -> bootloader finalizes version
+    -> active application
+```
+
+**Unconfirmed / failed trial**
+
+```text
+Trial application
+    -> watchdog or unconfirmed reset
+    -> bootloader increments attempts
+    -> attempt limit reached
+    -> restore verified backup
+    -> active application
 ```
 
 The key invariant is that the last confirmed application version remains authoritative until the candidate survives the trial-confirmation contract.

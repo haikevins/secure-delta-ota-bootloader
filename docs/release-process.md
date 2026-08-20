@@ -50,8 +50,8 @@ flowchart TD
     D --> DS["Signed delta SDOT"]
     F --> M["manifest.json"]
     DS --> M
-    M --> MS["Detached ECDSA manifest signature"]
-    MS --> V["Verify immutable release directory"]
+    M --> MS["Sign manifest with ECDSA"]
+    MS --> V["Verify release directory"]
     V --> H["HTTPS publication"]
     V --> Q["MQTTS command publication"]
 ```
