@@ -1,5 +1,17 @@
 # Benchmark and Portfolio Guide
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← HIL Results](hil-results.md) · [Results Report →](results-report.md)
+
+## Table of contents
+
+- [Run](#run)
+- [Generated reports](#generated-reports)
+- [Acceptance criteria](#acceptance-criteria)
+- [What is measured](#what-is-measured)
+- [Checked-in reference](#checked-in-reference)
+- [User-verified GCC run](#user-verified-gcc-run)
+- [Timing interpretation](#timing-interpretation)
+- [Portfolio use](#portfolio-use)
 The benchmark is reproducible and separates portable acceptance criteria from host/toolchain-specific observations.
 
 ## Run
@@ -129,3 +141,11 @@ Then pair the generated report with:
 - `docs/results-report.md`;
 - `docs/hil-results.md`;
 - `docs/portfolio-evidence.md`.
+
+## References
+
+- [`benchmark.py`](../scripts/benchmark.py)
+- [`reference.json`](../benchmarks/reference.json)
+- [`results-report.md`](results-report.md)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← HIL Results](hil-results.md) · [Results Report →](results-report.md)

@@ -1,7 +1,20 @@
 # Boot and Update State Machine
 
-Status: **Implemented: signed full/delta install, persistent recovery, trial boot and rollback**
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Firmware Container](firmware-container.md) · [Metadata / Boot Decision →](metadata-and-boot-decision.md)
 
+> **Status:** **Implemented: signed full/delta install, persistent recovery, trial boot and rollback**
+
+## Table of contents
+
+- [1. Update states](#1-update-states)
+- [2. High-level transition diagram](#2-high-level-transition-diagram)
+- [Implemented trial boot and rollback path](#implemented-trial-boot-and-rollback-path)
+- [3. Boot decision order](#3-boot-decision-order)
+- [4. Metadata design](#4-metadata-design)
+- [5. Application validity](#5-application-validity)
+- [6. Trial boot policy](#6-trial-boot-policy)
+- [7. Power-loss guarantees](#7-power-loss-guarantees)
+- [8. Illegal transitions](#8-illegal-transitions)
 ## 1. Update states
 
 ```c
@@ -82,6 +95,28 @@ Any unrecoverable validation/storage error -> FAILED.
 FAILED permits a new START after explicit cleanup.
 ```
 
+
+### UML state view
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> RECEIVING: START
+    RECEIVING --> ARTIFACT_READY: FINISH + CRC valid
+    ARTIFACT_READY --> VERIFYING_CONTAINER
+    VERIFYING_CONTAINER --> VERIFYING_BASE: delta
+    VERIFYING_CONTAINER --> PATCHING: full
+    VERIFYING_BASE --> PATCHING: base valid
+    PATCHING --> IMAGE_READY: target verified
+    IMAGE_READY --> BACKING_UP
+    BACKING_UP --> INSTALLING
+    INSTALLING --> VERIFYING_INSTALL
+    VERIFYING_INSTALL --> TRIAL_BOOT
+    TRIAL_BOOT --> CONFIRMED: application health confirm
+    TRIAL_BOOT --> ROLLBACK: attempt limit / invalid trial
+    CONFIRMED --> IDLE: finalize version
+    ROLLBACK --> IDLE: backup restored
+```
 
 ## Implemented trial boot and rollback path
 
@@ -248,3 +283,11 @@ Examples that must be rejected:
 - CONFIRMED without TRIAL_BOOT;
 - clearing backup before confirmation;
 - accepting a different update ID during RECEIVING without ABORT or new START cleanup.
+
+## References
+
+- [`boot_metadata.h`](../shared/include/boot_metadata.h)
+- [`boot_decision.c`](../node-stm32f103/bootloader/src/boot_decision.c)
+- [`boot_manager.c`](../node-stm32f103/bootloader/src/boot_manager.c)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Firmware Container](firmware-container.md) · [Metadata / Boot Decision →](metadata-and-boot-decision.md)

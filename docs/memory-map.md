@@ -1,7 +1,14 @@
 # Memory Map Specification
 
-Status: **Implemented memory map with redundant metadata, staging and rollback backup**
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Architecture](architecture.md) · [UART OTA Protocol →](uart-ota-protocol.md)
 
+> **Status:** **Implemented memory map with redundant metadata, staging and rollback backup**
+
+## Table of contents
+
+- [1. STM32F103C8T6 internal Flash](#1-stm32f103c8t6-internal-flash)
+- [2. SRAM](#2-sram)
+- [3. W25Q32 external SPI NOR Flash](#3-w25q32-external-spi-nor-flash)
 All addresses are inclusive unless stated otherwise.
 
 ## 1. STM32F103C8T6 internal Flash
@@ -82,3 +89,11 @@ The 128 KiB Backup Image partition uses the following internal sublayout:
 
 The image begins on a separate erase sector so a torn header commit can be
 retried without erasing backup data.
+
+## References
+
+- [`memory_map.h`](../shared/include/memory_map.h)
+- [`application.ld`](../node-stm32f103/application/linker/application.ld)
+- [`bootloader.ld`](../node-stm32f103/bootloader/linker/bootloader.ld)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Architecture](architecture.md) · [UART OTA Protocol →](uart-ota-protocol.md)

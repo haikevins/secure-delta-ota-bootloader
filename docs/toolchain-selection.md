@@ -1,5 +1,12 @@
 # Toolchain Selection
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Release Process](release-process.md) · [Make Commands →](make-command-reference.md)
+
+## Table of contents
+
+- [Automatic selection](#automatic-selection)
+- [Explicit selection](#explicit-selection)
+- [Flash scripts](#flash-scripts)
 The STM32 build supports two toolchains:
 
 - `gcc`: GNU Arm Embedded (`arm-none-eabi-gcc`)
@@ -42,3 +49,11 @@ The bootloader, application, and combined-image flash scripts now:
 - pass `TOOLCHAIN` only when it is non-empty;
 - unset an inherited empty value before invoking Make;
 - reject unsupported explicit values early.
+
+## References
+
+- [`stm32f103.mk`](../mk/stm32f103.mk)
+- [`Makefile`](../node-stm32f103/bootloader/Makefile)
+- [`Makefile`](../node-stm32f103/application/Makefile)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Release Process](release-process.md) · [Make Commands →](make-command-reference.md)

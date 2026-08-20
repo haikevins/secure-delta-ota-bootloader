@@ -1,5 +1,29 @@
 # Project Report — Secure Delta OTA Bootloader
 
+> **Scope:** Detailed engineering report covering architecture, constraints, protocol, secure container, recovery, hardware evidence, benchmark results, build quality, and known boundaries.
+
+[← Root README](README.md) · [Documentation](docs/README.md) · [VALIDATION →](VALIDATION.md)
+
+## Table of contents
+
+- [1. Executive summary](#1-executive-summary)
+- [2. Design goals and constraints](#2-design-goals-and-constraints)
+- [3. System architecture](#3-system-architecture)
+- [4. Hardware and memory architecture](#4-hardware-and-memory-architecture)
+- [5. UART OTA protocol](#5-uart-ota-protocol)
+- [6. Persistent update state machine](#6-persistent-update-state-machine)
+- [7. Delta OTA design](#7-delta-ota-design)
+- [8. Signed SDOT container](#8-signed-sdot-container)
+- [9. Release and network pipeline](#9-release-and-network-pipeline)
+- [10. Trial boot and rollback](#10-trial-boot-and-rollback)
+- [11. Deterministic hardware validation](#11-deterministic-hardware-validation)
+- [12. Benchmark results](#12-benchmark-results)
+- [13. Build quality](#13-build-quality)
+- [14. Packaging and key custody](#14-packaging-and-key-custody)
+- [15. Reproduction commands](#15-reproduction-commands)
+- [16. Known boundaries](#16-known-boundaries)
+- [17. Portfolio value](#17-portfolio-value)
+
 ## 1. Executive summary
 
 This project implements a secure and recoverable over-the-air firmware update system for an STM32F103C8T6 node without placing a network/TLS stack on the constrained MCU.
@@ -547,3 +571,12 @@ The repository demonstrates a complete cross-domain embedded system:
 - CI and evidence-driven validation.
 
 The strongest portfolio claim is not a single feature; it is the demonstrated end-to-end interaction between security, constrained embedded storage, network transport and recovery under deterministic physical faults.
+
+## References
+
+- [Root README](README.md)
+- [Documentation Index](docs/README.md)
+- [Validation Report](VALIDATION.md)
+
+
+[← Root README](README.md) · [Documentation](docs/README.md) · [VALIDATION →](VALIDATION.md)

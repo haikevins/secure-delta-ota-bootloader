@@ -1,21 +1,41 @@
-# Firmware Release Server — release pipeline
+# Firmware Release Server
 
-release pipeline implements the server and publication side of Secure Delta OTA.
+> **Scope:** Standard-library Python command-line service for verifying immutable releases, serving allow-listed files over HTTPS, selecting full/delta artifacts, and publishing update commands over MQTTS QoS 1.
 
-The server is deliberately small and uses only the Python standard library.
-OpenSSL CLI is used to verify the detached ECDSA release-manifest signature.
+[← ESP32 Gateway](../gateway-esp32/README.md) · [Root README](../README.md) · [Release Process](../docs/release-process.md)
 
-## Pin the authorized release key
+## Table of contents
 
-Production serving/command publication must not trust only the public key
-shipped inside a release. Configure the authorized public SPKI SHA-256
-fingerprint separately:
+- [Security model](#security-model)
+- [Commands](#commands)
+- [Release verification](#release-verification)
+- [HTTPS serving](#https-serving)
+- [Artifact selection](#artifact-selection)
+- [MQTT publication](#mqtt-publication)
+- [Directory structure](#directory-structure)
+
+## Security model
+
+The server does not authorize a release merely because that release contains a public key. Production serving/command publication pins the authorized public-key SPKI SHA-256 independently:
 
 ```bash
 export SDOTA_TRUSTED_KEY_SHA256=<64-hex-SPKI-SHA256>
 ```
 
-## Verify a release
+`verify_release_directory()` checks:
+
+1. manifest schema and release directory identity;
+2. included public-key SPKI SHA-256 against the manifest;
+3. optional/required external trusted-key fingerprint pin;
+4. detached ECDSA signature on `manifest.json`;
+5. file size, CRC32, SHA-256 for every artifact;
+6. each SDOT's internal format/size/version/CRC metadata against the manifest.
+
+This is a publication trust boundary; the STM32 bootloader still independently authenticates the SDOT before installation.
+
+## Commands
+
+### Verify
 
 ```bash
 python3 server/app/main.py verify \
@@ -24,7 +44,7 @@ python3 server/app/main.py verify \
   --trusted-key-sha256 "$SDOTA_TRUSTED_KEY_SHA256"
 ```
 
-## Serve releases over HTTPS
+### Serve HTTPS
 
 ```bash
 python3 server/app/main.py serve \
@@ -36,10 +56,7 @@ python3 server/app/main.py serve \
   --trusted-key-sha256 "$SDOTA_TRUSTED_KEY_SHA256"
 ```
 
-Available paths are intentionally limited to `/healthz` and versioned release
-files under `/releases/<release-id>/...`.
-
-## Build or publish an MQTT command
+### Print selected command
 
 ```bash
 python3 server/app/main.py command \
@@ -49,6 +66,8 @@ python3 server/app/main.py command \
   --device-id bluepill-001 \
   --trusted-key-sha256 "$SDOTA_TRUSTED_KEY_SHA256"
 ```
+
+### Publish command over MQTTS
 
 ```bash
 python3 server/app/main.py publish \
@@ -61,11 +80,72 @@ python3 server/app/main.py publish \
   --trusted-key-sha256 "$SDOTA_TRUSTED_KEY_SHA256"
 ```
 
-The server chooses an exact-base delta when available and otherwise selects the
-signed full SDOT. MQTT publication is QoS1 and waits for PUBACK.
+## Release verification
 
-See:
+```mermaid
+flowchart TD
+    D["Release directory"] --> M["Load manifest.json"]
+    M --> K["Parse signing-public.pem"]
+    K --> P["Check SPKI SHA-256 against manifest + external pin"]
+    P --> S["Verify detached manifest ECDSA signature"]
+    S --> A["Verify every artifact size + CRC32 + SHA-256"]
+    A --> C["Parse SDOT and cross-check manifest metadata"]
+    C --> V["Verified release"]
+```
 
-- `server/schemas/release pipeline-release-manifest.schema.json`
-- `docs/release pipeline-server-release-pipeline.md`
-- `PROJECT_REPORT.md`
+The release directory name must equal `release_id`; a release must contain exactly one full artifact, and delta selectors `(kind, base_version)` must be unique.
+
+## HTTPS serving
+
+The server is a TLS-wrapped `ThreadingHTTPServer` with TLS 1.2 minimum. It intentionally provides no directory listing.
+
+Allowed routes:
+
+```text
+GET/HEAD /healthz
+GET/HEAD /releases/<release-id>/<allowed-file>
+```
+
+Allowed file categories include the manifest/signature/checksums/release notes/public key plus `.sdot` and `.bin` artifacts. Path traversal is rejected by normalized path checks.
+
+## Artifact selection
+
+`select_artifact()` chooses:
+
+1. an exact-base delta when `prefer_delta=True` and a delta whose `base_version == current_version` exists;
+2. otherwise the mandatory full artifact.
+
+The server rejects a request when the device is already at or newer than the release target.
+
+## MQTT publication
+
+The generated command is compact JSON:
+
+```json
+{"cmd":"update","crc32":123,"schema":1,"size":1174,"target_version":3,"update_id":456,"url":"https://..."}
+```
+
+`publish_qos1()` opens a TLS MQTT connection, sends CONNECT, requires successful CONNACK, publishes QoS 1 with a packet identifier, and waits for the matching PUBACK before disconnecting.
+
+## Directory structure
+
+```text
+server/
+├── app/main.py                  CLI entry point
+├── app/models/release.py        normalized manifest model
+├── app/models/sdot.py           SDOT parser/cross-check model
+├── app/services/firmware_service.py
+├── app/services/https_service.py
+├── app/services/manifest_service.py
+├── app/services/mqtt_service.py
+├── app/services/signing_service.py
+├── schemas/                     JSON schemas
+└── tests/                       server test placeholder/assets
+```
+
+## References
+
+- [Release Process](../docs/release-process.md)
+- [Firmware Container](../docs/firmware-container.md)
+- [Threat Model](../docs/threat-model.md)
+- [`app/main.py`](app/main.py)

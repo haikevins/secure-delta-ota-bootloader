@@ -1,5 +1,19 @@
 # Hardware-in-the-Loop Results
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Test Plan](test-plan.md) · [Benchmark Guide →](benchmark-portfolio.md)
+
+## Table of contents
+
+- [Result](#result)
+- [Scenario matrix](#scenario-matrix)
+- [Reset/recovery invariants](#resetrecovery-invariants)
+- [Network fault invariants](#network-fault-invariants)
+- [Security-negative invariant](#security-negative-invariant)
+- [Trial and rollback policy](#trial-and-rollback-policy)
+- [Fault witnesses](#fault-witnesses)
+- [Final hardware markers](#final-hardware-markers)
+- [Key custody during HIL](#key-custody-during-hil)
+- [Reproduce](#reproduce)
 ## Result
 
 Deterministic physical fault matrix: **PASS — 9/9 scenarios**.
@@ -220,3 +234,11 @@ MQTT_PORT=8883
 ```
 
 See `README.md` for the complete hardware/environment variable reference.
+
+## References
+
+- [`fault_matrix.json`](../tests/fault/fault_matrix.json)
+- [`hil_test.py`](../scripts/hil_test.py)
+- [`reference.json`](../benchmarks/reference.json)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Test Plan](test-plan.md) · [Benchmark Guide →](benchmark-portfolio.md)

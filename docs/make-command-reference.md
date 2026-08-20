@@ -1,5 +1,20 @@
 # Make Command Reference
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Toolchain Selection](toolchain-selection.md) · [Test Plan →](test-plan.md)
+
+## Table of contents
+
+- [Discover commands](#discover-commands)
+- [Toolchain selection](#toolchain-selection)
+- [Validation and quality](#validation-and-quality)
+- [STM32 build](#stm32-build)
+- [ESP32 gateway](#esp32-gateway)
+- [Signed release](#signed-release)
+- [STM32 flashing](#stm32-flashing)
+- [Metadata tools](#metadata-tools)
+- [Hardware-in-the-loop](#hardware-in-the-loop)
+- [Cleaning](#cleaning)
+- [Suggested final validation sequence](#suggested-final-validation-sequence)
 This document is the dedicated command reference for the repository. `README.md` also contains the complete public target guide; this file is convenient when only command usage is needed.
 
 ## Discover commands
@@ -295,3 +310,11 @@ make warning-check TOOLCHAIN=clang
 make check TOOLCHAIN=clang
 make benchmark TOOLCHAIN=clang
 ```
+
+## References
+
+- [`Makefile`](../Makefile)
+- [`project_check.py`](../scripts/project_check.py)
+- [`hil_test.py`](../scripts/hil_test.py)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Toolchain Selection](toolchain-selection.md) · [Test Plan →](test-plan.md)

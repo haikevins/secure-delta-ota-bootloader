@@ -1,5 +1,32 @@
 # Validation Report
 
+> **Scope:** Reproduction-oriented validation record for static contracts, builds, security checks, deterministic fault injection, benchmark evidence, and explicit non-claims.
+
+[← Root README](README.md) · [Documentation](docs/README.md) · [← PROJECT REPORT](PROJECT_REPORT.md)
+
+## Table of contents
+
+- [1. Validation summary](#1-validation-summary)
+- [2. Main reproduction commands](#2-main-reproduction-commands)
+- [3. Static and packaging contracts](#3-static-and-packaging-contracts)
+- [4. Compiler-warning validation](#4-compiler-warning-validation)
+- [5. STM32 build and memory validation](#5-stm32-build-and-memory-validation)
+- [6. Delta validation](#6-delta-validation)
+- [7. Checked-in benchmark reference](#7-checked-in-benchmark-reference)
+- [8. User-verified GCC benchmark](#8-user-verified-gcc-benchmark)
+- [9. Deterministic fault-build matrix](#9-deterministic-fault-build-matrix)
+- [10. Physical HIL matrix](#10-physical-hil-matrix)
+- [11. Fault witnesses](#11-fault-witnesses)
+- [12. Final physical board state](#12-final-physical-board-state)
+- [13. Security validation](#13-security-validation)
+- [14. Release-pipeline validation](#14-release-pipeline-validation)
+- [15. Network fault validation](#15-network-fault-validation)
+- [16. Recovery checkpoint validation](#16-recovery-checkpoint-validation)
+- [17. Metadata validation](#17-metadata-validation)
+- [18. CI validation](#18-ci-validation)
+- [19. What is not claimed](#19-what-is-not-claimed)
+- [20. Evidence index](#20-evidence-index)
+
 ## 1. Validation summary
 
 Integrated project status: **PASS**.
@@ -402,3 +429,12 @@ These remain explicit deployment/security hardening topics.
 | Memory layout | `docs/memory-map.md` |
 | Claim mapping | `docs/portfolio-evidence.md` |
 | Full engineering report | `PROJECT_REPORT.md` |
+
+## References
+
+- [Root README](README.md)
+- [Documentation Index](docs/README.md)
+- [Validation Report](VALIDATION.md)
+
+
+[← Root README](README.md) · [Documentation](docs/README.md) · [← PROJECT REPORT](PROJECT_REPORT.md)

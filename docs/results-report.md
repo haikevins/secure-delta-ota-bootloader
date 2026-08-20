@@ -1,5 +1,21 @@
 # Consolidated Results Report
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Benchmark Guide](benchmark-portfolio.md) · [One-Page Summary →](portfolio-one-page.md)
+
+## Table of contents
+
+- [Summary](#summary)
+- [Hardware result](#hardware-result)
+- [Recovery evidence](#recovery-evidence)
+- [Security-negative evidence](#security-negative-evidence)
+- [Benchmark — checked-in Clang reference](#benchmark-checked-in-clang-reference)
+- [Benchmark — user-verified GNU Arm GCC run](#benchmark-user-verified-gnu-arm-gcc-run)
+- [Delta efficiency interpretation](#delta-efficiency-interpretation)
+- [Footprint headroom](#footprint-headroom)
+- [Build-quality result](#build-quality-result)
+- [Release pipeline result](#release-pipeline-result)
+- [Reproduce current results](#reproduce-current-results)
+- [Evidence sources](#evidence-sources)
 ## Summary
 
 This document consolidates the current portfolio evidence into one place.
@@ -251,3 +267,11 @@ make hil-test \
 - `scripts/project_check.py`
 - `scripts/benchmark.py`
 - `scripts/hil_test.py`
+
+## References
+
+- [`reference.json`](../benchmarks/reference.json)
+- [`hil-results.md`](hil-results.md)
+- [`VALIDATION.md`](../VALIDATION.md)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Benchmark Guide](benchmark-portfolio.md) · [One-Page Summary →](portfolio-one-page.md)

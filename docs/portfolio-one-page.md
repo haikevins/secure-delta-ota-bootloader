@@ -1,5 +1,17 @@
 # Secure Delta OTA Bootloader — One-Page Portfolio Summary
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Results Report](results-report.md) · [Demo Guide →](portfolio-demo.md)
+
+## Table of contents
+
+- [Problem](#problem)
+- [Architecture](#architecture)
+- [Security](#security)
+- [Delta update](#delta-update)
+- [Recovery](#recovery)
+- [Hardware evidence](#hardware-evidence)
+- [Measured GCC result](#measured-gcc-result)
+- [Skills demonstrated](#skills-demonstrated)
 ## Problem
 
 Safely update an STM32F103C8T6 over an unreliable network and power environment while keeping the constrained MCU free of a network/TLS stack.
@@ -57,3 +69,11 @@ Signed savings         85.32%
 ## Skills demonstrated
 
 Embedded C, Cortex-M3 boot flow, linker/memory layout, SPI NOR constraints, persistent metadata, COBS UART protocol, binary diff/patch, SHA-256, ECDSA P-256, ESP-IDF, HTTPS, MQTTS, release engineering, deterministic fault injection, SWD/OpenOCD and HIL automation.
+
+## References
+
+- [`README.md`](../README.md)
+- [`PROJECT_REPORT.md`](../PROJECT_REPORT.md)
+- [`results-report.md`](results-report.md)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Results Report](results-report.md) · [Demo Guide →](portfolio-demo.md)

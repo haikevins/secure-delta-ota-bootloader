@@ -1,5 +1,14 @@
 # Bootloader-to-Application Handoff
 
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Metadata / Boot Decision](metadata-and-boot-decision.md) · [External SPI Flash →](external-spi-flash.md)
+
+## Table of contents
+
+- [Memory contract](#memory-contract)
+- [Validation order](#validation-order)
+- [Cleanup and transfer](#cleanup-and-transfer)
+- [Why interrupts are re-enabled before the branch](#why-interrupts-are-re-enabled-before-the-branch)
+- [Application proof](#application-proof)
 ## Memory contract
 
 ```text
@@ -42,6 +51,26 @@ Application is structurally jumpable
 These are structural checks only. Cryptographic image validation is added in a
 secure-container path.
 
+### Handoff sequence
+
+```mermaid
+sequenceDiagram
+    participant B as Bootloader C
+    participant NV as NVIC / SysTick
+    participant RCC as RCC
+    participant SCB as SCB
+    participant ASM as Assembly handoff
+    participant A as Application Reset_Handler
+
+    B->>B: Validate vector, MSP, Thumb reset address
+    B->>NV: Stop SysTick, disable + clear interrupts
+    B->>RCC: RCC_DeInit()
+    B->>SCB: VTOR = application vector address
+    B->>ASM: pass MSP + reset handler
+    ASM->>ASM: restore reset-like CONTROL/PRIMASK, set MSP
+    ASM->>A: branch to reset handler
+```
+
 ## Cleanup and transfer
 
 `ApplicationJump_Execute()` performs the handoff in this order:
@@ -82,3 +111,11 @@ The boot metadata application:
 
 The heartbeat therefore demonstrates both successful reset-handler entry and
 working interrupt dispatch through the relocated application vector table.
+
+## References
+
+- [`application_jump.c`](../node-stm32f103/bootloader/src/application_jump.c)
+- [`application_handoff.s`](../node-stm32f103/bootloader/startup/application_handoff.s)
+- [`memory_map.h`](../shared/include/memory_map.h)
+
+[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Metadata / Boot Decision](metadata-and-boot-decision.md) · [External SPI Flash →](external-spi-flash.md)
