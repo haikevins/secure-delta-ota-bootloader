@@ -21,16 +21,16 @@
 The transfer buffer is `1024 B`; artifact persistence is streamed.
 
 ```mermaid
-flowchart TD
-    U["Validate HTTPS URL"] --> T["Open TLS HTTP connection"]
-    T --> H["Require 200 + bounded Content-Length"]
-    H --> B["ArtifactCache_BeginWrite"]
-    B --> S["Read HTTPS chunks"]
-    S --> W["Sequential cache write"]
-    W --> S
-    S -->|"EOF at exact length"| C["ArtifactCache_Commit"]
-    C --> V["Complete stored-image CRC verified"]
+flowchart TB
+    U["Validate HTTPS URL"] --> T["Open TLS connection"]
+    T --> H["Require 200 + bounded length"]
+    H --> B["Begin cache write"]
+    B --> S["Stream chunks into cache"]
+    S -->|"exact length"| C["Commit cache"]
+    C --> V["Verify stored CRC"]
 ```
+
+The streaming step repeats HTTP reads and sequential cache writes until the declared `Content-Length` is consumed exactly.
 
 Production uses the ESP x509 certificate bundle when configured. HIL can instead embed a host-generated public test CA certificate; the private CA key remains on the host.
 

@@ -21,16 +21,13 @@ The header records `update_id`, `target_version`, image size, image CRC32, data 
 ## Transaction model
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Invalid
-    Invalid --> ActiveWriter: ArtifactCache_BeginWrite
-    ActiveWriter --> ActiveWriter: sequential ArtifactCache_Write
-    ActiveWriter --> Verifying: expected_size reached
-    Verifying --> Valid: full readback CRC + header programmed
-    ActiveWriter --> Invalid: ArtifactCache_Abort
-    Verifying --> Invalid: CRC / Flash failure
-    Valid --> ActiveWriter: next artifact invalidates old header first
+flowchart TB
+    INVALID["Invalid"] -->|"BeginWrite"| WRITER["Active writer"]
+    WRITER -->|"size reached"| VERIFY["Verifying"]
+    VERIFY -->|"CRC + header OK"| VALID["Valid"]
 ```
+
+`ArtifactCache_Write()` keeps the cache in `Active writer` while chunks are appended. `ArtifactCache_Abort()` returns it to `Invalid`; CRC/Flash verification failure does the same. Beginning the next artifact from `Valid` invalidates the previous header before a new writer becomes active.
 
 The important power-loss rule is **header last**. A reset before the header commit leaves no valid cache record. `ArtifactCache_Open()` validates the header and recomputes the complete stored image CRC before returning a usable cache.
 

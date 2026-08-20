@@ -74,9 +74,9 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    APP["STM32 application"] -->|"reset / install request / confirm"| BL["STM32 bootloader"]
-    BL --> EXT["W25Q verify / reconstruct / backup"]
-    BL --> IF["Internal Flash install / rollback"]
+    APP["STM32 application"] -->|"reset / INSTALL / confirm"| BL["STM32 bootloader"]
+    BL --> EXT["W25Q verify / rebuild / backup"]
+    BL --> IF["Flash install / rollback"]
 ```
 
 ## 3. Responsibilities

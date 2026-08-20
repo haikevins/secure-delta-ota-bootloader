@@ -31,8 +31,8 @@ sequenceDiagram
     participant W as Wi-Fi / SNTP
     participant M as MQTTS broker
 
-    G->>W: Connect Wi-Fi + establish sane time
-    G->>M: Connect + subscribe command topic
+    G->>W: Connect Wi-Fi + sync time
+    G->>M: Connect + subscribe command
     M-->>G: QoS1 update command
     G->>M: Retained accepted status
 ```
@@ -59,11 +59,11 @@ sequenceDiagram
     participant S as STM32 UART
     participant M as MQTTS broker
 
-    G->>S: QUERY current version/state/capabilities
+    G->>S: QUERY version + state + caps
     S-->>G: HELLO info
     G->>S: Transfer / resume / install
     S-->>G: Progress + final target state
-    G->>M: Progress + retained confirmed/failed status
+    G->>M: Progress + final status
 ```
 
 The gateway progress callbacks publish coarse progress (roughly each additional 10% or completion) for `https` and `uart` stages.
@@ -86,16 +86,13 @@ The STM32 bootloader independently parses and verifies the signed SDOT container
 `artifact_cache` uses the `stm32_cache` data partition. Artifact bytes begin at offset `0x1000`; the first sector holds a CRC-protected cache header.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Invalid
-    Invalid --> Writing: begin write / invalidate header
-    Writing --> Writing: sequential data + streaming CRC32
-    Writing --> Verifying: expected size reached
-    Verifying --> Valid: complete stored-image CRC readback + header commit
-    Writing --> Invalid: abort / reset before header commit
-    Verifying --> Invalid: verification failure
-    Valid --> Writing: next download
+flowchart TB
+    INVALID["Invalid"] -->|"begin write"| WRITING["Writing"]
+    WRITING -->|"size reached"| VERIFY["Verifying"]
+    VERIFY -->|"CRC + header OK"| VALID["Valid"]
 ```
+
+While `Writing` is active, sequential chunks update the streaming CRC without changing cache state. Abort/reset before header commit returns the cache to `Invalid`; verification failure also returns to `Invalid`. Starting a new download from `Valid` invalidates the old header before entering `Writing`.
 
 `ArtifactCache_Open()` refuses a cache whose header is invalid and recomputes the complete image CRC before exposing it as a UART artifact.
 

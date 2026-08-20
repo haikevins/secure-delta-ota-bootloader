@@ -96,45 +96,45 @@ FAILED permits a new START after explicit cleanup.
 ```
 
 
-### UML state view
+### Focused persisted-state flows
 
 The persisted boot process consists of artifact acceptance, candidate preparation, and trial closure.
 
 **Artifact acceptance**
 
 ```mermaid
-stateDiagram-v2
-    direction TB
-    [*] --> IDLE
-    IDLE --> RECEIVING: START
-    RECEIVING --> ARTIFACT_READY: FINISH + CRC valid
-    ARTIFACT_READY --> VERIFYING_CONTAINER
+flowchart TB
+    IDLE["IDLE"] -->|"START"| RX["RECEIVING"]
+    RX -->|"FINISH + CRC valid"| READY["ARTIFACT_READY"]
+    READY --> VERIFY["VERIFYING_CONTAINER"]
 ```
+
+`DATA` and resume operations remain in `RECEIVING`; they update the persisted receive checkpoint rather than creating another boot state.
 
 **Candidate preparation and installation**
 
 ```mermaid
-stateDiagram-v2
-    direction TB
-    VERIFYING_CONTAINER --> VERIFYING_BASE: delta
-    VERIFYING_CONTAINER --> PATCHING: full
-    VERIFYING_BASE --> PATCHING: base valid
-    PATCHING --> IMAGE_READY: target verified
-    IMAGE_READY --> BACKING_UP
-    BACKING_UP --> INSTALLING
-    INSTALLING --> VERIFYING_INSTALL
-    VERIFYING_INSTALL --> TRIAL_BOOT
+flowchart TB
+    VERIFY["VERIFYING_CONTAINER"] --> TYPE{"Artifact type"}
+    TYPE -->|"Delta"| BASE["VERIFYING_BASE"]
+    TYPE -->|"Full"| PATCH["PATCHING"]
+    BASE -->|"base valid"| PATCH
+    PATCH --> READY["IMAGE_READY"]
+    READY --> BACKUP["BACKING_UP"]
+    BACKUP --> INSTALL["INSTALLING"]
+    INSTALL --> CHECK["VERIFYING_INSTALL"]
+    CHECK --> TRIAL["TRIAL_BOOT"]
 ```
 
 **Trial closure**
 
 ```mermaid
-stateDiagram-v2
-    direction TB
-    TRIAL_BOOT --> CONFIRMED: application health confirm
-    TRIAL_BOOT --> ROLLBACK: attempt limit / invalid trial
-    CONFIRMED --> IDLE: finalize version
-    ROLLBACK --> IDLE: backup restored
+flowchart TB
+    TRIAL["TRIAL_BOOT"] --> OUTCOME{"Trial result"}
+    OUTCOME -->|"confirmed"| CONFIRMED["CONFIRMED"]
+    CONFIRMED --> IDLE1["IDLE"]
+    OUTCOME -->|"limit / invalid"| ROLLBACK["ROLLBACK"]
+    ROLLBACK --> IDLE2["IDLE"]
 ```
 
 ## Implemented trial boot and rollback path

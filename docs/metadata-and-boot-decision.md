@@ -68,27 +68,31 @@ A partial target record has an invalid CRC and is ignored.
 
 Metadata loading first selects the newest valid generation or defaults when neither slot validates.
 
-```mermaid
-stateDiagram-v2
-    direction TB
-    [*] --> Load
-    Load --> SlotA: A newest valid
-    Load --> SlotB: B newest valid
-    Load --> Defaults: neither valid
+```text
+Load metadata
+├── Slot A valid and newer -> select Slot A
+├── Slot B valid and newer -> select Slot B
+└── neither slot valid     -> use defaults
 ```
 
-Commits always program the non-selected slot and make it authoritative only after readback verification:
+Commits always program the non-selected slot and make it authoritative only after readback verification.
 
-```mermaid
-stateDiagram-v2
-    direction TB
-    SlotA --> ProgramB: next commit
-    ProgramB --> VerifyB
-    VerifyB --> SlotB: CRC + byte compare valid
-    SlotB --> ProgramA: next commit
-    Defaults --> ProgramA: first commit
-    ProgramA --> VerifyA
-    VerifyA --> SlotA: CRC + byte compare valid
+**When Slot A is selected**
+
+```text
+Slot A selected
+    -> program Slot B with generation + 1
+    -> read back and verify CRC + bytes
+    -> Slot B becomes authoritative
+```
+
+**When Slot B is selected, or no valid slot exists**
+
+```text
+Slot B selected / defaults
+    -> program Slot A with next generation
+    -> read back and verify CRC + bytes
+    -> Slot A becomes authoritative
 ```
 
 ## 4. Generation ordering

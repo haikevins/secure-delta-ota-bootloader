@@ -59,11 +59,11 @@ The handoff has a C-side cleanup stage followed by a minimal assembly transfer.
 
 ```mermaid
 flowchart TB
-    V["Validate vector, MSP, Thumb reset address"] --> S["Stop SysTick"]
-    S --> N["Mask, disable, and clear NVIC interrupts"]
+    V["Validate MSP + reset vector"] --> S["Stop SysTick"]
+    S --> N["Mask + clear NVIC IRQs"]
     N --> R["RCC_DeInit()"]
-    R --> T["SCB->VTOR = application vector address"]
-    T --> H["Pass MSP + reset handler to assembly"]
+    R --> T["Set application VTOR"]
+    T --> H["Pass MSP + reset handler"]
 ```
 
 **Final stack/control transfer**
@@ -75,7 +75,7 @@ sequenceDiagram
     participant A as Application Reset_Handler
 
     B->>ASM: pass MSP + reset handler
-    ASM->>ASM: restore reset-like CONTROL/PRIMASK + set MSP
+    ASM->>ASM: restore CONTROL/PRIMASK + MSP
     ASM->>A: branch to reset handler
 ```
 

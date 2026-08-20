@@ -63,12 +63,12 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    APP["STM32 application"] -->|"INSTALL request + reset"| BL["STM32 bootloader"]
-    BL --> WORK["Verify / reconstruct / backup in W25Q"]
-    WORK --> INSTALL["Install + verify internal Flash"]
-    INSTALL --> TRIAL["Trial application boot"]
+    APP["STM32 application"] -->|"INSTALL + reset"| BL["STM32 bootloader"]
+    BL --> WORK["Verify / reconstruct / backup"]
+    WORK --> INSTALL["Install + verify Flash"]
+    INSTALL --> TRIAL["Trial boot"]
     TRIAL --> CONFIRM["Persist CONFIRMED + reset"]
-    CONFIRM --> FINAL["Bootloader finalizes active version"]
+    CONFIRM --> FINAL["Finalize active version"]
 ```
 
 The responsibilities are deliberately split:
@@ -130,14 +130,14 @@ sequenceDiagram
     participant S as Release server
     participant G as ESP32 gateway
 
-    CI->>CI: Validate application vector + size
-    CI->>CI: Build full SDOT and optional JojoDiff delta SDOT
-    CI->>CI: Sign SDOT + manifest with ECDSA P-256
-    CI->>S: Publish immutable release directory
+    CI->>CI: Validate vector + size
+    CI->>CI: Build full + delta SDOT
+    CI->>CI: Sign SDOT + manifest
+    CI->>S: Publish immutable release
     S->>G: MQTTS update command
     G->>S: HTTPS GET selected SDOT
     S-->>G: Bounded SDOT stream
-    G->>G: Persist stm32_cache + complete CRC readback
+    G->>G: Cache SDOT + CRC readback
 ```
 
 **UART staging on STM32**
@@ -149,12 +149,12 @@ sequenceDiagram
     participant F as W25Q SPI NOR
 
     G->>A: QUERY / HELLO
-    A-->>G: Version, state, capability, resume offset
+    A-->>G: State + resume offset
     G->>A: START / DATA / FINISH
-    A->>F: Persist bytes + 4 KiB receive checkpoints
+    A->>F: Persist bytes + checkpoints
     A->>A: Validate complete artifact CRC
     G->>A: INSTALL
-    A->>A: Persist install request + reset
+    A->>A: Persist INSTALL + reset
 ```
 
 **Bootloader verification, installation, and trial closure**
@@ -165,20 +165,20 @@ sequenceDiagram
     participant F as W25Q SPI NOR
     participant A as STM32 application
 
-    B->>F: Verify SDOT signature and policy
+    B->>F: Verify SDOT signature + policy
     alt Delta SDOT
-        B->>B: Verify active base version + SHA-256
+        B->>B: Verify base version + SHA-256
         B->>F: Stream JojoDiff reconstruction
     else Full SDOT
-        B->>F: Copy signed payload to reconstructed partition
+        B->>F: Copy payload to target image
     end
-    B->>F: Verify reconstructed SHA-256 + CRC32 + vector
-    B->>F: Backup current application + verify backup
-    B->>B: Install target page-by-page + verify
-    B->>A: Trial boot with persisted attempt count + IWDG
-    A->>A: Health window reaches confirmation point
+    B->>F: Verify hash + CRC + vector
+    B->>F: Backup + verify active image
+    B->>B: Install pages + verify
+    B->>A: Trial boot + IWDG
+    A->>A: Health window passes
     A->>B: Persist CONFIRMED and reset
-    B->>B: Finalize active_version, clear pending version
+    B->>B: Finalize active version
     B->>A: Normal application jump
 ```
 
@@ -193,41 +193,40 @@ The persistent state machine has three stages: artifact reception, candidate pre
 **Artifact reception and container acceptance**
 
 ```mermaid
-stateDiagram-v2
-    direction TB
-    [*] --> IDLE
-    IDLE --> RECEIVING: START
-    RECEIVING --> RECEIVING: DATA / resume
-    RECEIVING --> ARTIFACT_READY: FINISH + CRC valid
-    RECEIVING --> FAILED: unrecoverable receive/storage error
-    ARTIFACT_READY --> VERIFYING_CONTAINER: reset / INSTALL
-    VERIFYING_CONTAINER --> IDLE: artifact rejected
+flowchart TB
+    IDLE["IDLE"] -->|"START"| RX["RECEIVING"]
+    RX -->|"FINISH + CRC valid"| READY["ARTIFACT_READY"]
+    RX -->|"fatal receive error"| FAILED["FAILED"]
+    READY -->|"INSTALL + reset"| VERIFY["VERIFYING_CONTAINER"]
+    VERIFY -->|"rejected"| IDLE
 ```
+
+While the boot metadata state is `RECEIVING`, accepted `DATA` frames and resume activity advance the persisted receive offset without changing the boot state.
 
 **Candidate reconstruction and installation**
 
 ```mermaid
-stateDiagram-v2
-    direction TB
-    VERIFYING_CONTAINER --> VERIFYING_BASE: delta
-    VERIFYING_CONTAINER --> PATCHING: full
-    VERIFYING_BASE --> PATCHING: base version + SHA-256 valid
-    PATCHING --> IMAGE_READY: target verified
-    IMAGE_READY --> BACKING_UP
-    BACKING_UP --> INSTALLING: backup verified
-    INSTALLING --> VERIFYING_INSTALL
-    VERIFYING_INSTALL --> TRIAL_BOOT: install verified
+flowchart TB
+    VERIFY["VERIFYING_CONTAINER"] --> TYPE{"Artifact type"}
+    TYPE -->|"Delta"| BASE["VERIFYING_BASE"]
+    TYPE -->|"Full"| PATCH["PATCHING"]
+    BASE -->|"base valid"| PATCH
+    PATCH --> READY["IMAGE_READY"]
+    READY --> BACKUP["BACKING_UP"]
+    BACKUP --> INSTALL["INSTALLING"]
+    INSTALL --> CHECK["VERIFYING_INSTALL"]
+    CHECK --> TRIAL["TRIAL_BOOT"]
 ```
 
 **Trial confirmation or rollback**
 
 ```mermaid
-stateDiagram-v2
-    direction TB
-    TRIAL_BOOT --> CONFIRMED: application confirms health
-    CONFIRMED --> IDLE: finalize version
-    TRIAL_BOOT --> ROLLBACK: attempt limit / invalid trial
-    ROLLBACK --> IDLE: verified backup restored
+flowchart TB
+    TRIAL["TRIAL_BOOT"] --> OUTCOME{"Trial result"}
+    OUTCOME -->|"confirmed"| CONFIRMED["CONFIRMED"]
+    CONFIRMED --> IDLE1["IDLE"]
+    OUTCOME -->|"limit / invalid"| ROLLBACK["ROLLBACK"]
+    ROLLBACK --> IDLE2["IDLE"]
 ```
 
 Key recovery invariants:
