@@ -98,12 +98,24 @@ FAILED permits a new START after explicit cleanup.
 
 ### UML state view
 
+The persisted boot process consists of artifact acceptance, candidate preparation, and trial closure.
+
+**Artifact acceptance**
+
 ```mermaid
 stateDiagram-v2
+    direction TB
     [*] --> IDLE
     IDLE --> RECEIVING: START
     RECEIVING --> ARTIFACT_READY: FINISH + CRC valid
     ARTIFACT_READY --> VERIFYING_CONTAINER
+```
+
+**Candidate preparation and installation**
+
+```mermaid
+stateDiagram-v2
+    direction TB
     VERIFYING_CONTAINER --> VERIFYING_BASE: delta
     VERIFYING_CONTAINER --> PATCHING: full
     VERIFYING_BASE --> PATCHING: base valid
@@ -112,6 +124,13 @@ stateDiagram-v2
     BACKING_UP --> INSTALLING
     INSTALLING --> VERIFYING_INSTALL
     VERIFYING_INSTALL --> TRIAL_BOOT
+```
+
+**Trial closure**
+
+```mermaid
+stateDiagram-v2
+    direction TB
     TRIAL_BOOT --> CONFIRMED: application health confirm
     TRIAL_BOOT --> ROLLBACK: attempt limit / invalid trial
     CONFIRMED --> IDLE: finalize version

@@ -54,17 +54,22 @@ The receive path supports full, delta, and signed SDOT artifacts, but the secure
 `bootloader/src/boot_manager.c` is the reset-time coordinator. Its decision is derived from CRC-protected A/B metadata and current application-vector validity.
 
 ```mermaid
-flowchart TD
+flowchart TB
     R["Reset"] --> M["Load newest valid metadata generation"]
     M --> V["Validate current application vector"]
     V --> D["BootDecision_Evaluate"]
-    D -->|"artifact / validation / patch"| S["SecureContainer_Process"]
-    D -->|"backup / install / verify"| I["ImageInstaller_ProcessBasicFull"]
-    D -->|"trial"| T["Persist attempt + start IWDG + jump"]
-    D -->|"rollback"| B["Restore verified backup"]
-    D -->|"confirmed"| C["Finalize active version"]
-    D -->|"idle"| J["ApplicationJump_Execute"]
 ```
+
+`BootDecision_Evaluate()` maps the persisted state and vector validity to one reset-time action:
+
+| Decision class | Reset-time action |
+|---|---|
+| artifact / validation / patch | `SecureContainer_Process()` |
+| backup / install / verify | `ImageInstaller_ProcessBasicFull()` |
+| trial | persist attempt, start IWDG, then jump |
+| rollback | restore the verified backup |
+| confirmed | finalize the active version |
+| idle | `ApplicationJump_Execute()` |
 
 Before jumping, the bootloader validates:
 
@@ -92,17 +97,28 @@ The W25Q driver uses SPI1 on PA5/PA6/PA7 with PB0 as active-low chip select and 
 
 ## Reset-to-application path
 
+The reset path first dispatches normal boot, persisted update work, or a verified trial image.
+
 ```mermaid
 stateDiagram-v2
+    direction TB
     [*] --> Bootloader
     Bootloader --> ActiveApp: IDLE + valid vector
     Bootloader --> UpdateWork: persisted update state
-    UpdateWork --> Bootloader: checkpoint + reset/re-evaluation
-    Bootloader --> TrialApp: verified candidate installed
-    TrialApp --> Bootloader: CONFIRMED + reset
-    TrialApp --> Bootloader: watchdog/reset without confirmation
-    Bootloader --> Rollback: trial attempt limit
-    Rollback --> Bootloader: backup restored
+    UpdateWork --> Bootloader: checkpoint + reset
+    Bootloader --> TrialApp: candidate installed
+```
+
+Trial execution then closes through confirmation or rollback:
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    TrialApp --> CONFIRMED: health confirmed
+    CONFIRMED --> Bootloader: persist + reset
+    TrialApp --> Bootloader: watchdog / unconfirmed reset
+    Bootloader --> ROLLBACK: attempt limit
+    ROLLBACK --> Bootloader: backup restored
     Bootloader --> ActiveApp: rollback finalized
 ```
 

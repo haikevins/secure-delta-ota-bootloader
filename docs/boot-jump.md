@@ -53,21 +53,29 @@ secure-container path.
 
 ### Handoff sequence
 
+The handoff has a C-side cleanup stage followed by a minimal assembly transfer.
+
+**C-side cleanup**
+
+```mermaid
+flowchart TB
+    V["Validate vector, MSP, Thumb reset address"] --> S["Stop SysTick"]
+    S --> N["Mask, disable, and clear NVIC interrupts"]
+    N --> R["RCC_DeInit()"]
+    R --> T["SCB->VTOR = application vector address"]
+    T --> H["Pass MSP + reset handler to assembly"]
+```
+
+**Final stack/control transfer**
+
 ```mermaid
 sequenceDiagram
     participant B as Bootloader C
-    participant NV as NVIC / SysTick
-    participant RCC as RCC
-    participant SCB as SCB
     participant ASM as Assembly handoff
     participant A as Application Reset_Handler
 
-    B->>B: Validate vector, MSP, Thumb reset address
-    B->>NV: Stop SysTick, disable + clear interrupts
-    B->>RCC: RCC_DeInit()
-    B->>SCB: VTOR = application vector address
     B->>ASM: pass MSP + reset handler
-    ASM->>ASM: restore reset-like CONTROL/PRIMASK, set MSP
+    ASM->>ASM: restore reset-like CONTROL/PRIMASK + set MSP
     ASM->>A: branch to reset handler
 ```
 
