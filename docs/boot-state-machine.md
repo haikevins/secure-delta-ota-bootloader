@@ -53,7 +53,7 @@ RECEIVING ------------------------------+
   | DATA / resume                       |
   | FINISH + artifact CRC valid         | ABORT / unrecoverable error
   v                                     |
-ARTIFACT_READY                           |
+ARTIFACT_READY                          |
   | reset / INSTALL                     |
   v                                     |
 VERIFYING_CONTAINER                     |
