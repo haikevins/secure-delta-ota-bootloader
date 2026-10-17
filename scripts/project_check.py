@@ -139,7 +139,7 @@ def choose_toolchain() -> str:
 def validate_product_presentation() -> None:
     required = [
         "README.md",
-        "PROJECT_REPORT.md",
+        "REPORT.md",
         "VALIDATION.md",
         "docs/portfolio-one-page.md",
         "docs/portfolio-demo.md",
@@ -390,7 +390,7 @@ def validate_source_contracts() -> None:
 def validate_documentation_contracts() -> None:
     required = (
         "README.md",
-        "PROJECT_REPORT.md",
+        "REPORT.md",
         "VALIDATION.md",
         "docs/make-command-reference.md",
         "docs/results-report.md",

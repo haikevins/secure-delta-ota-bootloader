@@ -97,7 +97,7 @@ Then show:
 
 - `docs/hil-results.md`;
 - `docs/results-report.md`;
-- `PROJECT_REPORT.md`;
+- `REPORT.md`;
 - the hardware wiring/board.
 
 ## References

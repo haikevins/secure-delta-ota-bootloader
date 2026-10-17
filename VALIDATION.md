@@ -2,7 +2,7 @@
 
 > **Scope:** Reproduction-oriented validation record for static contracts, builds, security checks, deterministic fault injection, benchmark evidence, and explicit non-claims.
 
-[← Root README](README.md) · [Documentation](docs/README.md) · [← PROJECT REPORT](PROJECT_REPORT.md)
+[← Root README](README.md) · [Documentation](docs/README.md) · [← PROJECT REPORT](REPORT.md)
 
 ## Table of contents
 
@@ -428,7 +428,7 @@ These remain explicit deployment/security hardening topics.
 | UART protocol | `docs/uart-ota-protocol.md` |
 | Memory layout | `docs/memory-map.md` |
 | Claim mapping | `docs/portfolio-evidence.md` |
-| Full engineering report | `PROJECT_REPORT.md` |
+| Full engineering report | `REPORT.md` |
 
 ## References
 
@@ -437,4 +437,4 @@ These remain explicit deployment/security hardening topics.
 - [Validation Report](VALIDATION.md)
 
 
-[← Root README](README.md) · [Documentation](docs/README.md) · [← PROJECT REPORT](PROJECT_REPORT.md)
+[← Root README](README.md) · [Documentation](docs/README.md) · [← PROJECT REPORT](REPORT.md)

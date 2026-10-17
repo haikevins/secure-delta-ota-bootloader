@@ -201,7 +201,7 @@ Start with these documents depending on what you want to inspect:
 
 Full documentation index: [`docs/README.md`](docs/README.md)
 
-Comprehensive engineering report: [`PROJECT_REPORT.md`](PROJECT_REPORT.md)
+Comprehensive engineering report: [`REPORT.md`](REPORT.md)
 
 Validation/evidence summary: [`VALIDATION.md`](VALIDATION.md)
 

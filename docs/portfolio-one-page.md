@@ -73,7 +73,7 @@ Embedded C, Cortex-M3 boot flow, linker/memory layout, SPI NOR constraints, pers
 ## References
 
 - [`README.md`](../README.md)
-- [`PROJECT_REPORT.md`](../PROJECT_REPORT.md)
+- [`REPORT.md`](../REPORT.md)
 - [`results-report.md`](results-report.md)
 
 [↑ Documentation Index](README.md) · [← Root](../README.md) · [← Results Report](results-report.md) · [Demo Guide →](portfolio-demo.md)

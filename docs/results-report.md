@@ -258,7 +258,7 @@ make hil-test \
 
 ## Evidence sources
 
-- `PROJECT_REPORT.md`
+- `REPORT.md`
 - `VALIDATION.md`
 - `docs/hil-results.md`
 - `docs/benchmark-portfolio.md`
