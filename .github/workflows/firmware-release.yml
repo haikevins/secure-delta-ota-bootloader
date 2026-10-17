@@ -85,8 +85,7 @@ jobs:
           set -euo pipefail
           umask 077
           KEY="$RUNNER_TEMP/release-signing-private.pem"
-          printf '%s
-' "$SIGNING_KEY_PEM" > "$KEY"
+          printf '%s\n' "$SIGNING_KEY_PEM" > "$KEY"
           chmod 600 "$KEY"
           echo "SIGNING_KEY_PATH=$KEY" >> "$GITHUB_ENV"
 
