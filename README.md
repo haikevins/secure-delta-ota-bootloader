@@ -39,7 +39,7 @@ This repository implements those concerns as one end-to-end system instead of is
 ## System architecture
 
 ```mermaid
-flowchart LR
+flowchart TD
     CI["Developer / CI\nrelease tooling"] -->|"signed SDOT + manifest"| SERVER["Release server"]
     SERVER -->|"MQTTS command"| ESP["ESP32 gateway"]
     SERVER -->|"HTTPS artifact"| ESP
