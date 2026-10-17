@@ -1,59 +1,78 @@
 # Toolchain Selection
 
-[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Release Process](release-process.md) · [Make Commands →](make-command-reference.md)
+The STM32F103 firmware build supports two ARM toolchain paths. GNU Arm Embedded GCC is preferred; Clang/LLD is the fallback.
 
-## Table of contents
+## Supported toolchains
 
-- [Automatic selection](#automatic-selection)
-- [Explicit selection](#explicit-selection)
-- [Flash scripts](#flash-scripts)
-The STM32 build supports two toolchains:
+### GNU Arm Embedded GCC
 
-- `gcc`: GNU Arm Embedded (`arm-none-eabi-gcc`)
-- `clang`: Clang/LLD targeting `arm-none-eabi`
+The GCC path requires all of the following commands:
+
+```text
+arm-none-eabi-gcc
+arm-none-eabi-objcopy
+arm-none-eabi-size
+```
+
+On Ubuntu, the usual packages are:
+
+```bash
+sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi
+```
+
+### Clang/LLD fallback
+
+The fallback path requires the complete set:
+
+```text
+clang
+ld.lld
+llvm-objcopy
+size
+```
+
+Having `clang` alone is not sufficient because the firmware build also links with LLD and emits binary/Intel HEX artifacts with `llvm-objcopy`.
 
 ## Automatic selection
 
-When `TOOLCHAIN` is unset **or empty**, the common Makefile selects:
+When `TOOLCHAIN` is not set, the STM32 Make rules select the first complete toolchain in this order:
 
-1. GNU Arm GCC when `arm-none-eabi-gcc` is available.
-2. Otherwise Clang/LLD when the required LLVM tools are available.
+1. GNU Arm Embedded GCC;
+2. Clang/LLD;
+3. otherwise fail immediately with a missing-tool error.
 
-This includes shells or scripts that accidentally export an empty variable:
+This avoids selecting a partial host installation and failing later during link or artifact generation.
+
+Inspect the selected toolchain with:
 
 ```bash
-TOOLCHAIN="" make flash-combined
+make toolchain-info
 ```
-
-An empty value no longer disables auto-detection.
 
 ## Explicit selection
 
-```bash
-make TOOLCHAIN=gcc firmware
-make TOOLCHAIN=gcc flash-combined
-```
-
-or:
+Force GCC:
 
 ```bash
-make TOOLCHAIN=clang firmware
+make check TOOLCHAIN=gcc
 ```
 
-Any other non-empty value is rejected.
+Force Clang/LLD:
 
-## Flash scripts
+```bash
+make check TOOLCHAIN=clang
+```
 
-The bootloader, application, and combined-image flash scripts now:
+Explicit selection also validates the required companion tools before the integrated build starts.
 
-- pass `TOOLCHAIN` only when it is non-empty;
-- unset an inherited empty value before invoking Make;
-- reject unsupported explicit values early.
+## CI baseline
 
-## References
+Repository CI uses GNU Arm Embedded GCC for the primary firmware quality gate:
 
-- [`stm32f103.mk`](../mk/stm32f103.mk)
-- [`Makefile`](../node-stm32f103/bootloader/Makefile)
-- [`Makefile`](../node-stm32f103/application/Makefile)
+```bash
+make warning-check TOOLCHAIN=gcc
+make check TOOLCHAIN=gcc
+make benchmark TOOLCHAIN=gcc
+```
 
-[↑ Documentation Index](README.md) · [← Root](../README.md) · [← Release Process](release-process.md) · [Make Commands →](make-command-reference.md)
+The Clang path remains useful as a supported secondary build path and for local portability checks.

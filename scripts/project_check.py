@@ -102,18 +102,37 @@ def run(
 
 
 def choose_toolchain() -> str:
+    requirements = {
+        "gcc": (
+            "arm-none-eabi-gcc",
+            "arm-none-eabi-objcopy",
+            "arm-none-eabi-size",
+        ),
+        "clang": ("clang", "ld.lld", "llvm-objcopy", "size"),
+    }
+
+    def missing(toolchain: str) -> list[str]:
+        return [tool for tool in requirements[toolchain] if not shutil.which(tool)]
+
     explicit = os.environ.get("TOOLCHAIN", "").strip()
     if explicit:
-        if explicit not in {"gcc", "clang"}:
+        if explicit not in requirements:
             raise CheckError("TOOLCHAIN must be gcc or clang")
+        absent = missing(explicit)
+        if absent:
+            raise CheckError(
+                f"TOOLCHAIN={explicit} is incomplete; missing: " + ", ".join(absent)
+            )
         return explicit
-    if shutil.which("arm-none-eabi-gcc"):
+
+    if not missing("gcc"):
         return "gcc"
-    if shutil.which("clang") and shutil.which("llvm-objcopy"):
+    if not missing("clang"):
         return "clang"
     raise CheckError(
-        "no supported STM32 toolchain found "
-        "(arm-none-eabi-gcc or clang+llvm-objcopy)"
+        "no complete STM32 toolchain found "
+        "(gcc requires arm-none-eabi-gcc+arm-none-eabi-objcopy+arm-none-eabi-size; "
+        "clang requires clang+ld.lld+llvm-objcopy+size)"
     )
 
 
