@@ -4,6 +4,7 @@
 .github/workflows/firmware-release.yml
 .github/workflows/test.yml
 .gitignore
+CHANGELOG.md
 CONTRIBUTING.md
 FILES.txt
 LICENSE
@@ -35,6 +36,7 @@ docs/metadata-and-boot-decision.md
 docs/portfolio-demo.md
 docs/portfolio-evidence.md
 docs/portfolio-one-page.md
+docs/project-release-v1.0.0.md
 docs/release-process.md
 docs/results-report.md
 docs/test-plan.md
