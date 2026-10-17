@@ -1,12 +1,16 @@
+.github/ISSUE_TEMPLATE/bug_report.yml
+.github/PULL_REQUEST_TEMPLATE.md
 .github/workflows/build.yml
 .github/workflows/firmware-release.yml
 .github/workflows/test.yml
 .gitignore
+CONTRIBUTING.md
 FILES.txt
 LICENSE
 Makefile
 PROJECT_REPORT.md
 README.md
+SECURITY.md
 SHA256SUMS.txt
 VALIDATION.md
 benchmarks/README.md

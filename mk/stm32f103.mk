@@ -24,17 +24,28 @@ NODE_COMMON_DIR := $(NODE_DIR)/common
 BUILD_DIR ?= build
 OUT_DIR   ?= out
 
+GCC_TOOLCHAIN_READY := $(shell command -v arm-none-eabi-gcc >/dev/null 2>&1 && \
+  command -v arm-none-eabi-objcopy >/dev/null 2>&1 && \
+  command -v arm-none-eabi-size >/dev/null 2>&1 && echo yes)
+CLANG_TOOLCHAIN_READY := $(shell command -v clang >/dev/null 2>&1 && \
+  command -v ld.lld >/dev/null 2>&1 && \
+  command -v llvm-objcopy >/dev/null 2>&1 && \
+  command -v size >/dev/null 2>&1 && echo yes)
+
 ifeq ($(strip $(TOOLCHAIN)),)
-  ifneq ($(shell command -v arm-none-eabi-gcc 2>/dev/null),)
+  ifeq ($(GCC_TOOLCHAIN_READY),yes)
     TOOLCHAIN := gcc
-  else ifneq ($(shell command -v clang 2>/dev/null),)
+  else ifeq ($(CLANG_TOOLCHAIN_READY),yes)
     TOOLCHAIN := clang
   else
-    $(error No supported ARM toolchain found. Install arm-none-eabi-gcc or clang/lld)
+    $(error No complete ARM toolchain found. Install arm-none-eabi-gcc+arm-none-eabi-objcopy+arm-none-eabi-size or clang+ld.lld+llvm-objcopy+size)
   endif
 endif
 
 ifeq ($(TOOLCHAIN),gcc)
+  ifneq ($(GCC_TOOLCHAIN_READY),yes)
+    $(error TOOLCHAIN=gcc requires arm-none-eabi-gcc, arm-none-eabi-objcopy, and arm-none-eabi-size)
+  endif
   CC       := arm-none-eabi-gcc
   OBJCOPY  := arm-none-eabi-objcopy
   SIZE     := arm-none-eabi-size
@@ -43,6 +54,9 @@ ifeq ($(TOOLCHAIN),gcc)
   TOOLCHAIN_LINK_FLAGS := -nostdlib
   TOOLCHAIN_LIBS       := -lgcc
 else ifeq ($(TOOLCHAIN),clang)
+  ifneq ($(CLANG_TOOLCHAIN_READY),yes)
+    $(error TOOLCHAIN=clang requires clang, ld.lld, llvm-objcopy, and size)
+  endif
   CC       := clang
   OBJCOPY  := llvm-objcopy
   SIZE     := size

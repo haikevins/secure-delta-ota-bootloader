@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a reproducible defect in firmware, gateway, tooling, tests, or documentation.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not include private keys, credentials, production secrets, or exploitable vulnerability details here. Security issues should follow SECURITY.md.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is wrong, and which component is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include commit/tag, host OS, toolchain, hardware, and relevant ESP-IDF version when applicable.
+      placeholder: |
+        Revision: ...
+        Host OS: ...
+        Toolchain: ...
+        Hardware: ...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest deterministic sequence that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation output
+      description: Paste relevant make/CI/HIL output after removing secrets and sensitive information.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed secrets, credentials, and private signing material from this report.
+          required: true
+        - label: This report does not contain undisclosed exploit details for a security vulnerability.
+          required: true
