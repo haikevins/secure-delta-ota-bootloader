@@ -31,6 +31,8 @@
 |---|---|
 | [Threat Model](threat-model.md) | Assets, trust boundaries, addressed threats, non-goals |
 | [Release Process](release-process.md) | Immutable release creation, key custody, full/delta selection |
+| [Project Release v1.0.0](project-release-v1.0.0.md) | Stable source/portfolio baseline and publication notes |
+| [Changelog](../CHANGELOG.md) | Source-repository release history |
 | [Toolchain Selection](toolchain-selection.md) | GCC/Clang selection and reproducibility boundary |
 | [Make Command Reference](make-command-reference.md) | Public root targets and operational commands |
 

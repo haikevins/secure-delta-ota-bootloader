@@ -192,6 +192,8 @@ Start with these documents depending on what you want to inspect:
 | Review reset recovery | [Boot State Machine](docs/boot-state-machine.md) |
 | Review security assumptions | [Threat Model](docs/threat-model.md) |
 | Reproduce release creation | [Release Process](docs/release-process.md) |
+| Review source release history | [Changelog](CHANGELOG.md) |
+| Review the stable project baseline | [v1.0.0 Release Notes](docs/project-release-v1.0.0.md) |
 | Review test coverage | [Test Plan](docs/test-plan.md) |
 | Inspect physical test evidence | [HIL Results](docs/hil-results.md) |
 | Reproduce measurements | [Benchmark Guide](docs/benchmark-portfolio.md) |
