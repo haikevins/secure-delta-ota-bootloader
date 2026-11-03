@@ -74,9 +74,11 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    APP["STM32 application"] -->|"reset / INSTALL / confirm"| BL["STM32 bootloader"]
+    APP["STM32 application"] -->|"INSTALL: persist ARTIFACT_READY, then reset"| BL["STM32 bootloader"]
     BL --> EXT["W25Q verify / rebuild / backup"]
-    BL --> IF["Flash install / rollback"]
+    BL --> IF["Internal Flash install / rollback"]
+    BL -->|"Trial jump"| APP
+    APP -->|"Health confirmation: persist CONFIRMED, then reset"| BL
 ```
 
 ## 3. Responsibilities
@@ -110,9 +112,9 @@ flowchart TB
 - Enforce `update_id`, sequence and offset rules.
 - Store the artifact only in the external `Incoming Artifact` partition.
 - Update redundant download metadata.
-- Mark `ARTIFACT_READY` only after complete artifact CRC validation.
+- After `FINISH` validates complete artifact CRC32, mark the receiver session `ARTIFACT_READY`; persist the bootloader `UPDATE_ARTIFACT_READY` state only on signed-SDOT `INSTALL`.
 - Request a reset; it must not erase or overwrite the active application.
-- Confirm a successfully trial-booted application after self-test.
+- Confirm a trial image by committing `UPDATE_CONFIRMED` to internal metadata and resetting. The current automatic health criterion is basic initialization/main-loop liveness after about 750 ms, not exhaustive peripheral self-testing.
 
 ### 3.4 STM32 Bootloader
 
@@ -132,7 +134,7 @@ flowchart TB
 
 Stores:
 
-- redundant metadata mirror;
+- redundant external metadata sectors for incoming-download checkpoints (and optional legacy install handoff);
 - downloaded full/delta container;
 - reconstructed target firmware;
 - backup of the previous internal application;
@@ -144,7 +146,7 @@ Stores:
 2. ESP32 may pre-check an artifact, but STM32 bootloader remains the final trust boundary.
 3. Application code never writes bootloader Flash.
 4. Application code never installs firmware directly into active internal Flash.
-5. A delta update is accepted only when base version and base hash match.
+5. A delta update is accepted only when base version and base hash match; the signed SDOT bootloader remains the final verifier.
 6. Any delta-specific error may request a full-image fallback.
 7. Installation begins only after the incoming artifact and reconstructed target image have been validated.
 8. Backup is retained until the trial application is confirmed.

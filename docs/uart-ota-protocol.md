@@ -100,7 +100,7 @@ CRC32 covers bytes from `magic` through the final payload byte. It does not cove
 | `0x14` | RESUME | Gateway → Node | Resume an existing matching update |
 | `0x20` | INSTALL | Gateway → Node | Request reset into bootloader for installation |
 | `0x21` | STATUS | Both | Request or publish detailed state |
-| `0x22` | CONFIRM | Application internal API / optional wire diagnostic | Confirm trial image |
+| `0x22` | CONFIRM | Gateway → Node (optional wire path) | Confirm trial image by invoking `TrialConfirmation_ConfirmNow()`, ACK, then reset; automatic local confirmation also exists |
 | `0x70` | ACK | Node → Gateway | Successful request response |
 | `0x71` | NACK | Node → Gateway | Rejected request with status code |
 
@@ -173,7 +173,7 @@ container_header_size    u32
 
 START acceptance checks:
 
-- state is IDLE, FAILED or resumable RECEIVING;
+- the application-side OTA receiver is in an allowed local state (IDLE, FAILED or resumable RECEIVING); this does **not** imply that a bootloader persisted in `UPDATE_FAILED` can run UART START;
 - artifact size fits incoming partition;
 - container format is supported;
 - target version policy is preliminarily acceptable;
@@ -218,15 +218,28 @@ The receiver checks:
 FINISH moves the **runtime receiver** to `ARTIFACT_READY` but does not yet
 persist the bootloader handoff and does not reset the MCU.
 
-For `INSTALL (0x20)`, the application-side receiver then:
+For `INSTALL (0x20)`, the application receiver requires an empty payload,
+`ARTIFACT_READY` runtime state, a matching `update_id`, and a nonzero target
+version. It then follows one of two code paths:
 
-1. validates target version, image size and vector table;
-2. writes the CRC-protected external Metadata A/B handoff record;
-3. commits internal Metadata A/B as `UPDATE_ARTIFACT_READY`;
-4. transmits ACK completely;
-5. resets into the bootloader.
+**Signed SDOT (default, `SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY=0`):**
 
-Secure container parsing/signature verification is handled by the bootloader security boundary.
+1. Detect the SDOT magic in the staged Incoming artifact; the application does
+   **not** authenticate the signature or validate target vectors.
+2. Commit internal Metadata A/B with `UPDATE_ARTIFACT_READY`, `pending_version`,
+   `active_update_id`, and the expected/received artifact size.
+3. ACK, complete transmission, and reset into the bootloader.
+4. Bootloader parses and authenticates the signed container, verifies the image
+   and delta base where applicable, then performs backup/install/trial.
+
+**Unsigned legacy (compile-time opt-in only):** the receiver may validate a raw
+full-image vector table or legacy delta envelope and write the external A/B
+install-handoff record. This path is **disabled in the default secure build**;
+an unsigned artifact is rejected when the opt-in flag is not set.
+
+`FINISH` alone changes only the receiver runtime session; the signed-SDOT boot
+handoff is made persistent on `INSTALL`. The application does not overwrite the
+active internal application during reception.
 
 ## 12. RESUME behavior
 
@@ -247,9 +260,9 @@ Gateway sends matching `update_id` and expected artifact identity. Node responds
 | IDLE | HELLO, QUERY, START |
 | RECEIVING | HELLO, QUERY, DATA, FINISH, ABORT, RESUME |
 | ARTIFACT_READY | HELLO, QUERY, INSTALL, ABORT |
-| Bootloader processing states | QUERY/STATUS only; DATA rejected |
-| TRIAL_BOOT | QUERY/STATUS; confirmation is local application action |
-| FAILED | HELLO, QUERY, START, ABORT |
+| Bootloader processing states | No application UART receiver is running; the normal OTA command table does not apply |
+| TRIAL_BOOT | When trial Application is running: HELLO/QUERY and optional CONFIRM; the automatic local confirmation path is preferred |
+| FAILED | Application-side receiver supports local FAILED handling if running; persisted bootloader `UPDATE_FAILED` maps to STAY_RECOVERY (no UART START handler shown in that boot path) |
 
 ## 15. Security note
 

@@ -2,6 +2,12 @@
 
 [↑ Documentation Index](README.md) · [← Root](../README.md) · [← Benchmark Guide](benchmark-portfolio.md) · [One-Page Summary →](portfolio-one-page.md)
 
+**Evidence scope:** the recorded **9/9 HIL** result is nine deterministic
+fault scenarios, not a measured 100-update-cycle stress test. See
+[`test-plan.md`](test-plan.md) for the separate extended reliability target.
+These results are preserved as recorded evidence; this documentation pass does
+not rerun physical fault injection.
+
 ## Table of contents
 
 - [Summary](#summary)
@@ -111,7 +117,7 @@ Properties:
 
 Host/security validation rejects a target version that is not newer than the active version.
 
-## Benchmark — checked-in Clang reference
+## Benchmark checked-in Clang reference
 
 | Metric | Value |
 |---|---:|
@@ -138,7 +144,7 @@ benchmarks/reference.csv
 benchmarks/reference.md
 ```
 
-## Benchmark — user-verified GNU Arm GCC run
+## Benchmark user-verified GNU Arm GCC run
 
 ```text
 bootloader flash       9412 B

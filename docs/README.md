@@ -7,6 +7,7 @@
 ## Table of contents
 
 - [Core design](#core-design)
+- [Architecture diagrams](#architecture-diagrams)
 - [Security and release](#security-and-release)
 - [Verification and results](#verification-and-results)
 - [Portfolio views](#portfolio-views)
@@ -24,6 +25,20 @@
 | [Metadata and Boot Decision](metadata-and-boot-decision.md) | How are A/B metadata records committed and selected? |
 | [Boot Jump](boot-jump.md) | How is the Cortex-M3 application vector validated and transferred safely? |
 | [External SPI Flash](external-spi-flash.md) | How is W25Q storage wired, partitioned, and protected? |
+
+## Architecture diagrams
+
+The standalone Mermaid files are maintained as **views of implementation**, not
+independent specifications. For memory sizes prefer `shared/include/memory_map.h`
+and both STM32 linker scripts; for update actions prefer `boot_decision.c`,
+`boot_manager.c`, `secure_container.c` and the application OTA receiver.
+
+| Diagram | Intended scope |
+|---|---|
+| [System architecture](diagrams/system-architecture.mmd) | Release transport, Gateway, STM32 Application and secure Bootloader trust boundary |
+| [Update flow](diagrams/update-flow.mmd) | Signed SDOT download, INSTALL handoff, trial confirmation or rollback |
+| [Boot flow](diagrams/boot-flow.mmd) | Reset-time decision dispatch and normal Cortex-M3 application handoff |
+| [Memory map](diagrams/memory-map.mmd) | Exact STM32 internal and W25Q32 external partition boundaries |
 
 ## Security and release
 

@@ -4,17 +4,21 @@
 
 ## Table of contents
 
-- [0:00–0:45 — Architecture](#000-045-architecture)
-- [0:45–1:30 — Memory and protocol](#045-130-memory-and-protocol)
-- [1:30–2:15 — Secure release](#130-215-secure-release)
-- [2:15–3:10 — Delta and recovery](#215-310-delta-and-recovery)
-- [3:10–4:10 — Hardware evidence](#310-410-hardware-evidence)
-- [4:10–5:00 — Benchmark and closure](#410-500-benchmark-and-closure)
-## 0:00–0:45 — Architecture
+- [Architecture](#architecture)
+- [Memory and protocol](#memory-and-protocol)
+- [Secure release](#secure-release)
+- [Delta and recovery](#delta-and-recovery)
+- [Hardware evidence](#hardware-evidence)
+- [Benchmark and closure](#benchmark-and-closure)
+## Architecture
+
+**Suggested timing:** 0:00–0:45
 
 Show `README.md` and explain the split trust model: ESP32 handles network transport; STM32 bootloader remains authoritative for signature verification, version policy, patching, install and rollback.
 
-## 0:45–1:30 — Memory and protocol
+## Memory and protocol
+
+**Suggested timing:** 0:45–1:30
 
 Open:
 
@@ -25,7 +29,9 @@ docs/uart-ota-protocol.md
 
 Highlight the 24 KiB bootloader budget, 38 KiB application partition, 128 KiB staging partitions and the COBS UART packet with sequence/offset/retry/resume.
 
-## 1:30–2:15 — Secure release
+## Secure release
+
+**Suggested timing:** 1:30–2:15
 
 Show:
 
@@ -37,11 +43,15 @@ node-stm32f103/bootloader/include/trusted_key.h
 
 Explain SHA-256 + ECDSA P-256, key ID, anti-downgrade and the intentionally unprovisioned checked-in trust anchor.
 
-## 2:15–3:10 — Delta and recovery
+## Delta and recovery
+
+**Suggested timing:** 2:15–3:10
 
 Show the JojoDiff generator and STM32 streaming patch adapter. Then open `tests/fault/fault_matrix.json` and highlight deterministic resets during patch, backup, install and rollback.
 
-## 3:10–4:10 — Hardware evidence
+## Hardware evidence
+
+**Suggested timing:** 3:10–4:10
 
 Open `docs/hil-results.md`. Show the **9/9 PASS** result, including tampered-signature rejection and exact v1 restoration after reset during rollback.
 
@@ -55,7 +65,9 @@ make hil-test \
   SDOTA_HOST_IP=<PC_LAN_IP>
 ```
 
-## 4:10–5:00 — Benchmark and closure
+## Benchmark and closure
+
+**Suggested timing:** 4:10–5:00
 
 Run:
 
