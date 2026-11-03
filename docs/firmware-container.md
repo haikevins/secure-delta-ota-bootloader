@@ -16,11 +16,11 @@
 - [8. Signed bytes](#8-signed-bytes)
 - [9. Validation order](#9-validation-order)
 - [10. Product identity](#10-product-identity)
-- [11. Unsupported initial scaffold features](#11-unsupported-initial-scaffold-features)
-- [full-image OTA compatibility note](#full-image-ota-compatibility-note)
-- [delta generation compatibility note](#delta-generation-compatibility-note)
-- [streaming delta reconstruction functional-envelope note](#streaming-delta-reconstruction-functional-envelope-note)
-- [signed secure container implementation note](#signed-secure-container-implementation-note)
+- [11. Unsupported v1 features](#11-unsupported-v1-features)
+- [12. Implemented signed SDOT v1 + SCX1 profile](#12-implemented-signed-sdot-v1--scx1-profile)
+- [13. Historical engineering formats](#13-historical-engineering-formats)
+- [14. Trust-anchor provisioning](#14-trust-anchor-provisioning)
+
 ## 1. Goals
 
 The same outer container format carries either:
@@ -97,7 +97,12 @@ typedef struct
 #define FW_SIGNATURE_ED25519          2U
 ```
 
-The exact production signature algorithm is intentionally selected in signed secure container after code-size measurement. Protocol version 1 reserves identifiers for ECDSA-P256 and Ed25519. initial scaffold requires a signed-container interface but does not falsely claim that either implementation already fits the 24 KiB bootloader budget.
+The **implemented signed SDOT profile uses ECDSA P-256** (`1`) and SHA-256
+(`1`), with a 64-byte raw signature; `FW_SIGNATURE_ED25519` is a reserved enum
+value, **not** evidence of an implemented Ed25519 verifier. The canonical v1
+header comprises 120 fixed bytes plus a mandatory 20-byte `SCX1` extension.
+See [`firmware_container.h`](../shared/include/firmware_container.h) and
+`FirmwareContainer_Parse()` for actual accepted fields.
 
 ## 5. Version encoding
 
@@ -168,7 +173,7 @@ Initial fixed values are placeholders until board/product registration in platfo
 
 They are explicitly present in the signed header rather than inferred only from signing keys.
 
-## 11. Unsupported initial scaffold features
+## 11. Unsupported v1 features
 
 The following flags are not allowed in format version 1 implementation until explicitly added:
 
@@ -180,82 +185,52 @@ The following flags are not allowed in format version 1 implementation until exp
 - writable calibration/configuration segments.
 
 
-## full-image OTA compatibility note
+## 12. Implemented signed SDOT v1 + SCX1 profile
 
-The secure container format above remains the target format, but full-image OTA does
-not parse or authenticate it yet. The full-image OTA basic full OTA test transfers the
-raw linker-produced `application.bin`; the START payload plus the external
-handoff record carries image size, target version and CRC32. Secure container
-parsing/signature verification can evolve without changing
-the internal application load address.
-
-
-## delta generation compatibility note
-
-delta generation now generates and host-verifies the delta payload format used by
-`FW_IMAGE_DELTA`.
-
-The generated payload is a JojoDiff-compatible stream and the delta generation JSON
-metadata records the exact values needed for later secure-container assembly:
+The canonical signed artifact used by the secure build is:
 
 ```text
-base_version
-target_version
-payload_size
-target_image_size
-target_load_address
-base_image_sha256
-target_image_sha256
-payload_crc32
+fixed SDOT header (120 bytes)
+SCX1 extension v1 (20 bytes)
+full-image or JojoDiff-compatible delta payload
+ECDSA P-256 signature (64 bytes; big-endian r[32] || s[32])
 ```
 
-delta generation does not yet serialize the final signed container header and does not
-claim authenticity. Container signing is provided by the SDOT secure-container layer. STM32 patch
-application starts in streaming delta reconstruction.
+`header_size = 140` and the extension carries `key_id`, `base_image_size`, and
+`target_image_crc32`. The signature authenticates the exact 140-byte canonical
+header **and** payload (the signature bytes themselves are excluded).
+`FW_SIGNATURE_ECDSA_P256` and `FW_HASH_SHA256` identify the supported signature
+profile. Signed full and delta artifacts are produced by the host release
+pipeline (`tools/secure_container.py`, `tools/release.py`) and verified by
+`SecureContainer_LoadVerifiedInfo()` before destructive installation.
 
+For both image types, the bootloader uses `UPDATE_PATCHING` as the persisted
+**target-image preparation** state. Full image: copy validated payload into
+Reconstructed; delta: verify the active base and apply the patch to
+Reconstructed. Both paths verify the reconstructed target before backup/install.
+Unsigned raw full and streaming-delta artifacts are **disabled by default**
+(`SECURE_CONTAINER_ALLOW_UNSIGNED_LEGACY=0`).
 
-## streaming delta reconstruction functional-envelope note
+## 13. Historical engineering formats
 
-streaming delta reconstruction introduces a temporary 48-byte `D13P` engineering envelope around
-the JojoDiff-compatible payload so the STM32 bootloader can persist exact
-base/target sizes, versions and CRC32 values across reset.
+Earlier project stages used an unsigned raw full-image path and an engineering
+`D13P` envelope around JojoDiff-compatible delta bytes for streaming/recovery
+tests. Those are **not** the authenticated release format. The optional legacy
+branch is compile-time gated; it must not be presented as the default secure OTA
+workflow. The signed SDOT v1 + SCX1 container supersedes those scaffolding
+formats for normal updates.
 
-`D13P` is not the final secure container and is not signed. It exists only to
-exercise the complete embedded delta path together with the signed-container path.
-The frozen `FirmwareContainerHeader_t` remains the target authenticated
-container format.
+## 14. Trust-anchor provisioning
 
-
-## signed secure container implementation note
-
-signed secure container now implements the previously reserved signed-container interface.
-
-The fixed header is 120 bytes. A signed `SCX1` extension v1 adds
-20 bytes, so the implemented canonical `header_size` is 140 bytes.
-
-`SCX1` carries:
-
-```text
-key_id
-base_image_size
-target_image_crc32
-```
-
-The implemented signature profile is:
-
-```text
-hash_algorithm      = FW_HASH_SHA256
-signature_algorithm = FW_SIGNATURE_ECDSA_P256
-signature_size      = 64
-signature encoding  = big-endian r[32] || s[32]
-```
-
-The signature covers the complete 140-byte header plus payload. Unsigned raw full and streaming delta reconstruction artifacts are disabled by default in the secure build.
-
-The private signing key remains host-side. The STM32 bootloader contains only a
-public P-256 trust anchor and key ID.
-
-Key custody, release authorization and server publication are handled by the release pipeline.
+The checked-in [`trusted_key.h`](../node-stm32f103/bootloader/include/trusted_key.h)
+sets `TRUSTED_KEY_PROVISIONED` to `0`, with an unprovisioned public-key slot.
+`SecureContainer_LoadVerifiedInfo()` explicitly rejects secure installation
+when the trust anchor is not provisioned. Reproducible/HIL tooling can inject
+temporary test keys; this is **not** production key provisioning. Before
+deployment, install an authorized P-256 public key and key ID in the
+bootloader, protect the signing private key on the release host, and use the
+signed release workflow. Do not claim that a stock unprovisioned clone can
+install production SDOT artifacts without this step.
 
 ## References
 

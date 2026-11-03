@@ -1,16 +1,37 @@
 sequenceDiagram
-    participant S as Server
-    participant E as ESP32
-    participant A as STM32 App
-    participant B as Bootloader
-    S->>E: MQTT update notification
-    E->>S: HTTPS manifest/artifact
+    autonumber
+    participant S as Release server
+    participant E as ESP32 gateway
+    participant A as STM32 application
+    participant X as W25Q32 external Flash
+    participant M as Internal boot metadata A/B
+    participant B as STM32 bootloader
+
+    S-->>E: MQTTS update notification
+    E->>S: HTTPS GET manifest / signed SDOT artifact
+    S-->>E: Artifact bytes
     E->>A: HELLO / QUERY
-    A-->>E: version, state, resume offset
-    E->>A: START + DATA...
-    A-->>E: ACK/NACK
-    E->>A: FINISH / INSTALL
-    A->>B: Reset
-    B->>B: Verify, reconstruct, backup, install
-    B->>A: Trial boot
-    A->>B: Confirm application
+    A-->>E: Version, state, persisted resume offset
+    E->>A: START + DATA chunks (COBS / CRC32)
+    A->>X: Stage incoming artifact + checkpoint
+    A-->>E: ACK / NACK and resume offset
+    E->>A: FINISH (complete CRC verification)
+    A-->>E: ACK (receiver ARTIFACT_READY)
+    E->>A: INSTALL (matching update_id)
+    A->>M: Commit UPDATE_ARTIFACT_READY
+    A-->>E: ACK
+    A->>B: MCU reset into bootloader
+    B->>X: Authenticate SDOT, verify base and reconstruct target
+    B->>X: Back up previously installed application
+    B->>M: Persist install / trial state
+    B->>A: Install verified image, then trial jump
+    alt Application confirms trial
+        A->>M: Commit UPDATE_CONFIRMED
+        A->>B: NVIC_SystemReset()
+        B->>M: Finalize confirmation and promote active version
+        B->>A: Jump to confirmed application
+    else Failed / unconfirmed trial attempts
+        B->>X: Read verified backup
+        B->>M: Persist rollback progress
+        B->>A: Restore previous application and boot
+    end

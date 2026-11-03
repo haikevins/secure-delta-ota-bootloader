@@ -14,13 +14,18 @@
 ```text
 Bootloader vector table   0x08000000
 Application vector table  0x08006000
-Application end           0x0800FBFF
-Metadata page             0x0800F800
+Application end inclusive 0x0800F7FF
+Application end exclusive 0x0800F800
+Metadata A                0x0800F800-0x0800FBFF
+Metadata B                0x0800FC00-0x0800FFFF
 SRAM                      0x20000000–0x20004FFF
 Initial top of stack      0x20005000
 ```
 
-The application linker script locates `.isr_vector` exactly at `0x08006000`.
+The application linker script locates `.isr_vector` exactly at `0x08006000`
+and restricts the application image to 38 KiB.
+`APPLICATION_END_ADDRESS` in `memory_map.h` is exclusive (`0x0800F800`);
+the last valid application byte is `0x0800F7FF`.
 Its first word is `_estack`; its second word is `Reset_Handler` with the Thumb
 bit set by the assembler/linker.
 
@@ -48,8 +53,9 @@ Reset handler code address inside application partition?
 Application is structurally jumpable
 ```
 
-These are structural checks only. Cryptographic image validation is added in a
-secure-container path.
+These are structural jump checks only; they do **not** authenticate firmware.
+Signed SDOT authenticity is enforced separately in the bootloader secure-container
+processing path before an update is installed.
 
 ### Handoff sequence
 

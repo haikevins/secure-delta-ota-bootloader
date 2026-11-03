@@ -1,14 +1,20 @@
 flowchart TB
-    subgraph Internal[STM32 Internal Flash 64 KiB]
-      BL[Bootloader 24 KiB\n0x08000000-0x08005FFF]
-      APP[Application 39 KiB\n0x08006000-0x0800FBFF]
-      META[Metadata 1 KiB\n0x0800FC00-0x0800FFFF]
+    subgraph Internal["STM32F103C8T6 internal Flash - 64 KiB"]
+        direction TB
+        BL["Bootloader - 24 KiB<br/>0x08000000-0x08005FFF"]
+        APP["Application - 38 KiB<br/>0x08006000-0x0800F7FF"]
+        MA["Boot metadata A - 1 KiB<br/>0x0800F800-0x0800FBFF"]
+        MB["Boot metadata B - 1 KiB<br/>0x0800FC00-0x0800FFFF"]
     end
-    subgraph External[W25Q32 4 MiB]
-      EMA[Metadata A/B 8 KiB]
-      INC[Incoming 128 KiB]
-      REC[Reconstructed 128 KiB]
-      BAK[Backup 128 KiB]
-      LOG[Logs 64 KiB]
-      RSV[Reserved]
+
+    subgraph External["W25Q32 SPI NOR - 4 MiB"]
+        direction TB
+        EA["External metadata A - 4 KiB<br/>0x000000-0x000FFF"]
+        EB["External metadata B - 4 KiB<br/>0x001000-0x001FFF"]
+        INC["Incoming SDOT artifact - 128 KiB<br/>0x002000-0x021FFF"]
+        REC["Reconstructed target - 128 KiB<br/>0x022000-0x041FFF"]
+        BAK["Rollback backup - 128 KiB<br/>0x042000-0x061FFF"]
+        LOG["Logs - 64 KiB<br/>0x062000-0x071FFF"]
+        RSV["Reserved - 3636 KiB<br/>0x072000-0x3FEFFF"]
+        TEST["Destructive driver self-test - 4 KiB<br/>0x3FF000-0x3FFFFF"]
     end

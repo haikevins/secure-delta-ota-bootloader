@@ -7,7 +7,7 @@
 ## Table of contents
 
 - [Required test categories](#required-test-categories)
-- [Final reliability target](#final-reliability-target)
+- [Reliability target versus checked-in evidence](#reliability-target-versus-checked-in-evidence)
 - [boot metadata hardware acceptance](#boot-metadata-hardware-acceptance)
 - [power-loss recovery power-loss acceptance](#power-loss-recovery-power-loss-acceptance)
 ## Required test categories
@@ -75,9 +75,22 @@
 - power loss during rollback;
 - invalid backup prevents destructive installation start.
 
-## Final reliability target
+## Reliability target versus checked-in evidence
 
-At least 100 automated update cycles with fault injection and no unrecoverable brick before the project is declared complete.
+**Extended target (not yet demonstrated by the checked-in evidence):** at least
+100 automated update cycles with fault injection and no unrecoverable brick.
+The separate boot-jump endurance checklist below also targets at least 100
+resets. These are desired reliability/qualification tests, not measured
+results in this document.
+
+**Recorded evidence:** [`hil-results.md`](hil-results.md) documents **9/9
+specific deterministic HIL scenarios PASS**, including power-loss and rollback
+fault paths. Nine passing **scenarios** do not establish 100 independent update
+**cycles**. The `v1.0.0` repository/source release is a source/portfolio
+baseline; it is not a claim of production qualification against the extended
+100-cycle target. To close this item, check in reproducible execution logs
+showing scenario, iteration, firmware versions, final application hash, and
+reset/fault witness for each cycle.
 
 ## boot metadata hardware acceptance
 

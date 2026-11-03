@@ -13,8 +13,11 @@
 - [7. LED diagnostics](#7-led-diagnostics)
 ## 1. Purpose
 
-persistent metadata adds the first persistent boot state. It does **not** install OTA images.
-Its responsibilities are:
+This document describes the **persistent metadata storage and pure boot-decision
+components**. These components do not themselves install OTA images; the integrated
+bootloader does perform signed validation, reconstruction, installation, trial
+boot, rollback, and recovery through `BootManager`, `SecureContainer`, and
+`ImageInstaller`. Their responsibilities here are:
 
 - persist a CRC-protected `BootMetadata_t` record;
 - retain two independently erasable internal-Flash copies;
@@ -26,7 +29,7 @@ Its responsibilities are:
 
 ## 2. Internal Flash revision
 
-The initial scaffold single-page placeholder is replaced by two 1 KiB pages:
+The implemented layout uses two separately erasable 1 KiB pages:
 
 ```text
 0x08000000  Bootloader       24 KiB
@@ -119,16 +122,35 @@ hardware fault from bricking an otherwise valid pre-OTA product image.
 ## 6. Boot decision ownership
 
 `BootDecision_Evaluate()` is host-testable and has no peripheral dependency.
-It maps persisted states to actions such as resume download, restart patch,
-resume install, boot trial or rollback. persistent metadata executes only safe active-image
-jumps (`IDLE`, `RECEIVING`, non-expired `TRIAL_BOOT`). Actions owned by later
-states remain in bootloader recovery with a nine-pulse PC13 pattern.
+It maps persisted states to actions; `BootManager_Run()` dispatches those actions
+into the owning implementation and reevaluates metadata after each completed
+transition. In particular:
+
+| Persisted state | Decision action |
+|---|---|
+| `UPDATE_IDLE` | `BOOT_ACTION_JUMP_ACTIVE` (subject to valid vectors) |
+| `UPDATE_RECEIVING` | `BOOT_ACTION_RESUME_DOWNLOAD` (jump active app if valid) |
+| `UPDATE_ARTIFACT_READY` | `BOOT_ACTION_PROCESS_ARTIFACT` |
+| `UPDATE_VERIFYING_CONTAINER`, `UPDATE_VERIFYING_BASE` | `BOOT_ACTION_RESTART_VALIDATION` |
+| `UPDATE_PATCHING` | `BOOT_ACTION_RESTART_PATCH` |
+| `UPDATE_IMAGE_READY`, `UPDATE_BACKING_UP` | `BOOT_ACTION_CONTINUE_BACKUP` |
+| `UPDATE_INSTALLING` | `BOOT_ACTION_RESUME_INSTALL` |
+| `UPDATE_VERIFYING_INSTALL` | `BOOT_ACTION_VERIFY_INSTALL` |
+| `UPDATE_TRIAL_BOOT` | `BOOT_ACTION_BOOT_TRIAL` or `BOOT_ACTION_RESUME_ROLLBACK` at attempt limit / invalid vectors |
+| `UPDATE_CONFIRMED` | `BOOT_ACTION_FINALIZE_CONFIRMATION` |
+| `UPDATE_ROLLBACK` | `BOOT_ACTION_RESUME_ROLLBACK` |
+| `UPDATE_FAILED` | `BOOT_ACTION_STAY_RECOVERY` |
+
+A persisted `UPDATE_FAILED` does **not** jump to the Application in the current
+boot-decision implementation. The bootloader's recovery LED loop is not an
+application-side UART `START` handler; do not present it as remote recovery.
 
 ## 7. LED diagnostics
 
 - 1–6 pulses: invalid application vector reason from boot metadata;
 - 8 pulses: metadata storage/load fatal error;
-- 9 pulses: a valid metadata state requires a recovery action;
+- 9 pulses: `BootManager` cannot complete/dispatch the state and stays in a
+  fatal recovery LED loop (not every non-idle state causes this pattern);
 - five fast pulses followed by application heartbeat: active image booted.
 
 ## References

@@ -16,7 +16,9 @@
 - [Reproduce](#reproduce)
 ## Result
 
-Deterministic physical fault matrix: **PASS — 9/9 scenarios**.
+Deterministic physical fault matrix: **PASS — 9/9 scenarios** (recorded
+repository evidence; not 100 independent update cycles and not rerun by this
+documentation-only change).
 
 Machine-checkable evidence summary:
 

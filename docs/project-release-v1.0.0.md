@@ -43,7 +43,8 @@ The checked-in benchmark reference records:
 - signed full SDOT: `11,480 B`;
 - signed delta savings: **89.77%**.
 
-The physical HIL suite records **9/9 PASS**, including reset/power-loss behavior during reconstruction, backup, installation and rollback, plus HTTPS truncation, MQTT disconnect, and tampered-signature rejection.
+The physical HIL suite records **9/9 PASS** (nine distinct scenarios, not a
+100-cycle endurance qualification), including reset/power-loss behavior during reconstruction, backup, installation and rollback, plus HTTPS truncation, MQTT disconnect, and tampered-signature rejection.
 
 Primary evidence:
 

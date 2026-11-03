@@ -1,13 +1,21 @@
-flowchart TD
-    R[Reset at 0x08000000] --> C[Bootloader SystemInit]
-    C --> L[PC13 startup window]
-    L --> V[Read application MSP and reset vector at 0x08006000]
-    V --> Q{Vectors valid?}
-    Q -->|No| E[Repeat coded LED error]
-    Q -->|Yes| S[Stop SysTick and clear NVIC]
-    S --> D[RCC DeInit]
-    D --> T[Set VTOR to 0x08006000]
-    T --> H[Assembly handoff: set MSP and reset masks]
-    H --> A[Branch to application Reset_Handler]
-    A --> I[Application SystemInit]
-    I --> Y[Application SysTick heartbeat]
+flowchart TB
+    R["Reset -> bootloader at 0x08000000"] --> M["Load/validate internal metadata A/B"]
+    M --> D{"BootDecision_Evaluate + application vectors"}
+    D -->|"IDLE / RECEIVING, valid app"| J["Normal application jump"]
+    D -->|"ARTIFACT_READY / verification / patch"| V["SecureContainer_Process / recovery"]
+    D -->|"IMAGE_READY / backup / install"| I["ImageInstaller_ProcessBasicFull"]
+    D -->|"CONFIRMED"| C["TrialBoot_FinalizeConfirmation"]
+    D -->|"TRIAL_BOOT, attempts remain"| T["Persist attempt; start IWDG"]
+    D -->|"ROLLBACK / trial limit / invalid trial vectors"| B["ImageInstaller_ProcessRollback"]
+    D -->|"FAILED / invalid and unrecoverable state"| E["Stay in bootloader error / recovery LED loop"]
+    V --> M
+    I --> M
+    C --> M
+    B --> M
+    T --> J
+    J --> P["Validate MSP / Thumb Reset_Handler"]
+    P --> S["Stop SysTick; mask and clear NVIC"]
+    S --> H["Reset RCC; set VTOR to 0x08006000"]
+    H --> X["Assembly handoff: MSP / CONTROL / PRIMASK"]
+    X --> A["Branch to application Reset_Handler"]
+    A --> O["Application init, SysTick and main loop"]

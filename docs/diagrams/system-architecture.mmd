@@ -1,8 +1,11 @@
-flowchart TD
-    CI[Firmware Development / CI] -->|HTTPS artifacts| GW[ESP32 Gateway]
-    CI -->|MQTT notification| GW
-    GW -->|Custom UART OTA| APP[STM32 Application]
-    APP -->|SPI storage| EXT[W25Q32 External Flash]
-    APP -->|Reset request| BL[STM32 Secure Bootloader]
-    BL -->|Read artifact / backup / reconstructed image| EXT
-    BL -->|Install and jump| APP
+flowchart TB
+    CI["Developer / CI release tooling"] -->|"Signed SDOT + manifest"| SRV["Release server"]
+    SRV -->|"MQTTS update command"| GW["ESP32 gateway"]
+    SRV -->|"HTTPS manifest + artifact"| GW
+    GW -->|"COBS + CRC32 over UART"| APP["STM32 application"]
+    APP -->|"Stage artifact + download checkpoint"| EXT["W25Q32 SPI NOR"]
+    APP -->|"Persist ARTIFACT_READY in internal metadata, then reset"| BL["STM32 bootloader"]
+    BL <-->|"Verify / reconstruct / backup"| EXT
+    BL -->|"Install / rollback"| IF["STM32 internal application Flash"]
+    BL -->|"Trial boot via reset-vector jump"| APP
+    APP -->|"Confirm via internal metadata, then reset"| BL

@@ -17,7 +17,7 @@ Nominal size: 64 KiB, `0x08000000`–`0x0800FFFF`.
 
 | Region | Start | End | Size | Purpose |
 |---|---:|---:|---:|---|
-| Bootloader | `0x08000000` | `0x08005FFF` | 24 KiB | Boot decision, validation, future patch/install/rollback |
+| Bootloader | `0x08000000` | `0x08005FFF` | 24 KiB | Boot decision, signature validation, patch/install/rollback |
 | Application | `0x08006000` | `0x0800F7FF` | 38 KiB | Active product application |
 | Metadata A | `0x0800F800` | `0x0800FBFF` | 1 KiB | Redundant boot record A |
 | Metadata B | `0x0800FC00` | `0x0800FFFF` | 1 KiB | Redundant boot record B |
@@ -65,16 +65,19 @@ Nominal size: 4 MiB, `0x000000`–`0x3FFFFF`.
 | Reconstructed Image | `0x022000` | `0x041FFF` | 128 KiB | Reconstructed target image |
 | Backup Image | `0x042000` | `0x061FFF` | 128 KiB | Verified active-image backup |
 | Update Logs | `0x062000` | `0x071FFF` | 64 KiB | Bounded diagnostics |
-| Reserved | `0x072000` | `0x3FEFFF` | Remaining | Future use |
+| Reserved | `0x072000` | `0x3FEFFF` | 3636 KiB | Future use |
 | external-flash integration Self-test | `0x3FF000` | `0x3FFFFF` | 4 KiB | Destructive driver validation |
 
 The external-flash integration driver and storage abstraction enforce these bounds. External metadata does not replace the two internal boot-critical records introduced in persistent metadata.
 
-The install handoff uses the first 36 bytes of each 4 KiB external metadata sector for
-the A/B install handoff record. Receive recovery additionally stores a 40-byte download
-checkpoint at sector offset `0x100`. Because either record update requires a
-whole-sector erase, the storage layer preserves the other valid record while
-rewriting its target A/B sector.
+Each external metadata sector reserves 36 bytes at offset `0x000` for the
+legacy A/B install-handoff record. **Signed SDOT (the default OTA path) requests
+installation through the internal boot metadata A/B** (`UPDATE_ARTIFACT_READY`)
+instead of this external handoff. Receive recovery stores a 40-byte download
+checkpoint at external-sector offset `0x100`. A record update erases a whole
+sector; the storage layer preserves the other valid record type when updating
+the target A/B sector. External metadata is not interchangeable with the two
+1 KiB internal boot-critical metadata pages.
 
 
 ### Backup Image sublayout
